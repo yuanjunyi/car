@@ -11,14 +11,6 @@ The goals / steps of this project are the following:
 
 [//]: # (Image References)
 
-[image1]: ./examples/visualization.jpg "Visualization"
-[image2]: ./examples/grayscale.jpg "Grayscaling"
-[image3]: ./examples/random_noise.jpg "Random Noise"
-[image4]: ./examples/placeholder.png "Traffic Sign 1"
-[image5]: ./examples/placeholder.png "Traffic Sign 2"
-[image6]: ./examples/placeholder.png "Traffic Sign 3"
-[image7]: ./examples/placeholder.png "Traffic Sign 4"
-[image8]: ./examples/placeholder.png "Traffic Sign 5"
 [image11]: ./writeup/distribution_training.png "Distribution Training"
 [image12]: ./writeup/distribution_validation.png "Distribution Validation"
 [image13]: ./writeup/grayscale.png
@@ -90,17 +82,17 @@ My final model consisted of the following layers:
 
 | Layer         		|     Description	        					|
 |:---------------------:|:---------------------------------------------:|
-| Input         		| 32x32x1 grayscale image   							|
+| Input         		| 32x32x1 grayscale image   					|
 | Convolution 5x5     	| 1x1 stride, same padding, outputs 32x32x108 	|
 | RELU					|												|
 | Max pooling	      	| 2x2 stride,  outputs 16x16x108 				|
 | Convolution 5x5     	| 1x1 stride, same padding, outputs 16x16x108 	|
 | RELU					|												|
-| Max pooling	      	| 2x2 stride,  outputs 8x8x108 				|
-| Fully connected		| outputs 100        									|
-| Dropout				| 0.5 probability        									|
-|	RELU			|												|
-|	Fully connected					|	outputs 43											|
+| Max pooling	      	| 2x2 stride,  outputs 8x8x108 					|
+| Fully connected		| outputs 100        							|
+| Dropout				| 0.5 probability        						|
+| RELU					|													|
+| Fully connected		| outputs 43						|
 
 
 
@@ -142,11 +134,11 @@ Here are the results of the prediction:
 
 | Image			        |     Prediction	        					|
 |:---------------------:|:---------------------------------------------:|
-| Road work      		| Slippery road   									|
-| Speed limit (30km/h)     			| Speed limit (30km/h) 								|
-| No passing					| Speed limit (120km/h)											|
-| Priority road     | Priority road              |
-| Slippery road	      		| Slippery road					 				|
+| Road work      		| Slippery road   								|
+| Speed limit (30km/h)  | Speed limit (30km/h) 							|
+| No passing			| Speed limit (120km/h)							|
+| Priority road     	| Priority road              					|
+| Slippery road	      	| Slippery road					 				|
 | Slippery road			| Slippery Road      							|
 
 
@@ -158,53 +150,58 @@ For the first image, the model is uncertain and it makes a wrong prediction.
 
 | Probability         	|     Prediction	        					|
 |:---------------------:|:---------------------------------------------:|
-| .39         			| Slippery road   									|
+| .39         			| Slippery road   								|
 | .15     				| Road work										|
-| .11					| Bicycles crossing											|
-| .08	      			| Beware of ice/snow					 				|
-| .08				    | Bumpy road     							|
+| .11					| Bicycles crossing								|
+| .08	      			| Beware of ice/snow			 				|
+| .08				    | Bumpy road     		  						|
 
 For the second image, the model is very certain and it makes a correct prediction.
+
 | Probability         	|     Prediction	        					|
 |:---------------------:|:---------------------------------------------:|
-| .81         			| Speed limit (30km/h)   									|
-| .05     				| Speed limit (80km/h)										|
-| .05					| Speed limit (80km/h)											|
-| .02	      			| Speed limit (80km/h)					 				|
-| .01				    | Speed limit (70km/h)     							|
+| .81         			| Speed limit (30km/h)  						|
+| .05     				| Speed limit (80km/h)							|
+| .05					| Speed limit (80km/h)							|
+| .02	      			| Speed limit (80km/h)					 		|
+| .01				    | Speed limit (70km/h)     						|
 
 For the third image, the model is uncertain and it makes a wrong prediction.
+
 | Probability         	|     Prediction	        					|
 |:---------------------:|:---------------------------------------------:|
-| .37         			| Speed limit (120km/h)   									|
-| .11     				| Speed limit (70km/h)										|
-| .07					| No passing											|
-| .07	      			| Speed limit (50km/h)					 				|
-| .06				    | Speed limit (20km/h)     							|
+| .37         			| Speed limit (120km/h)   						|
+| .11     				| Speed limit (70km/h)							|
+| .07					| No passing									|
+| .07	      			| Speed limit (50km/h)							|
+| .06				    | Speed limit (20km/h)     						|
 
 For the fourth image, the model is extremely certain and it makes a correct prediction.
+
 | Probability         	|     Prediction	        					|
 |:---------------------:|:---------------------------------------------:|
-| .99         			| Priority road   									|
-| .00     				| No vehicles										|
+| .99         			| Priority road   								|
+| .00     				| No vehicles									|
 | .00					| Yield											|
-| .00	      			| End of all speed and passing limits					 				|
-| .00				    | Keep right     							|
+| .00	      			| End of all speed and passing limits			|
+| .00				    | Keep right     								|
 
 For the fifth image, the model very certain and it makes a correct prediction.
+
 | Probability         	|     Prediction	        					|
 |:---------------------:|:---------------------------------------------:|
-| .78         			| Slippery road   									|
-| .07     				| Bicycles crossing										|
-| .04					| Wild animals crossing											|
-| .01	      			| Dangerous curve to the left					 				|
-| .01				    | Beware of ice/snow     							|
+| .78         			| Slippery road   								|
+| .07     				| Bicycles crossing								|
+| .04					| Wild animals crossing							|
+| .01	      			| Dangerous curve to the left					|
+| .01				    | Beware of ice/snow     						|
 
 For the sixth image, the model is uncertain and it makes a correct prediction.
+
 | Probability         	|     Prediction	        					|
 |:---------------------:|:---------------------------------------------:|
-| .32         			| Slippery road   									|
-| .07     				| Right-of-way at the next intersection										|
-| .07					| Double curve											|
-| .07	      			| Dangerous curve to the right					 				|
-| .05				    | Beware of ice/snow     							|
+| .32         			| Slippery road   								|
+| .07     				| Right-of-way at the next intersection			|
+| .07					| Double curve									|
+| .07	      			| Dangerous curve to the right	 				|
+| .05				    | Beware of ice/snow     						|
