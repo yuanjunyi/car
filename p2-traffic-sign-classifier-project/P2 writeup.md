@@ -106,15 +106,15 @@ My final model results were:
 If an iterative approach was chosen:
 * What was the first architecture that was tried and why was it chosen?
 
-I used LeNet-5.
+	I used LeNet-5.
 
 * What were some problems with the initial architecture?
 
-With LeNet-5 and the original training set, I failed to reach an accuracy of over 80%. So I was suspecting that the training set is too small and that the capacity of the model is not sufficient.
+	With LeNet-5 and the original training set, I failed to reach an accuracy of over 80%. So I was suspecting that the training set is too small and that the capacity of the model is not sufficient.
 
 * How was the architecture adjusted and why was it adjusted? Typical adjustments could include choosing a different model architecture, adding or taking away layers (pooling, dropout, convolution, etc), using an activation function or changing the activation function. One common justification for adjusting an architecture would be due to overfitting or underfitting. A high accuracy on the training set but low accuracy on the validation set indicates over fitting; a low accuracy on both sets indicates under fitting.
 
-After resolving the small dataset problem, I focused to improve the model. I just randomly increase its capacity by increasing the number of convolution feature layers and monitor how the training accuracy and evaluation accuracy evolve. Once it seems overfitting, I introduced dropout and L2 regularization.
+	After resolving the small dataset problem, I focused to improve the model. I just randomly increase its capacity by increasing the number of convolution feature layers and monitor how the training accuracy and evaluation accuracy evolve. Once it seems overfitting, I introduced dropout and L2 regularization.
 
 ### Test a Model on New Images
 
