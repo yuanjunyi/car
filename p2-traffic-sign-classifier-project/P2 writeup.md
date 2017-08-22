@@ -140,7 +140,7 @@ Here are the results of the prediction:
 | Slippery road	      	| Slippery road					 				|
 | Slippery road			| Slippery Road      							|
 
-The model was able to correctly guess 4 of the 6 traffic signs, which gives an accuracy of 66.7%. This compares infavorably to the accuracy on the test set of 92.8% and the model seems to be overfitting. However, with only 6 images, I feel this conclusion is not reliable. I found another 2 test images and the model predicts correctly this time:
+The model was able to correctly guess 4 of the 6 traffic signs, which gives an accuracy of 66.7%. This compares unfavorably to the accuracy on the test set of 92.8% and the model seems to be overfitting. However, with only 6 images, I feel this conclusion is not reliable. I found another 2 test images and the model predicts correctly this time:
 
 ![alt text][image21] ![alt text][image22]
 
