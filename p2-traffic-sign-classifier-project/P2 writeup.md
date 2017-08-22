@@ -20,6 +20,8 @@ The goals / steps of this project are the following:
 [image18]: ./resized-test-images/e.jpg
 [image19]: ./resized-test-images/f.jpg
 [image20]: ./resized-test-images/h.jpg
+[image21]: ./resized-test-images/c.jpg
+[image22]: ./resized-test-images/a.jpg
 
 ## Rubric Points
 ### Here I will consider the [rubric points](https://review.udacity.com/#!/rubrics/481/view) individually and describe how I addressed each point in my implementation.  
@@ -138,7 +140,14 @@ Here are the results of the prediction:
 | Slippery road	      	| Slippery road					 				|
 | Slippery road			| Slippery Road      							|
 
-The model was able to correctly guess 4 of the 6 traffic signs, which gives an accuracy of 66.7%. This compares favorably to the accuracy on the test set of 92.8%
+The model was able to correctly guess 4 of the 6 traffic signs, which gives an accuracy of 66.7%. This compares infavorably to the accuracy on the test set of 92.8% and the model seems to be overfitting. However, with only 6 images, I feel this conclusion is not reliable. I found another 2 test images and the model predicts correctly this time:
+
+![alt text][image21] ![alt text][image22]
+
+| Image			        |     Prediction	        					|
+|:---------------------:|:---------------------------------------------:|
+| Road work      		| Road   								        |
+| No passing            | No passing 						        	|
 
 #### 3. Describe how certain the model is when predicting on each of the five new images by looking at the softmax probabilities for each prediction. Provide the top 5 softmax probabilities for each image along with the sign type of each probability. (OPTIONAL: as described in the "Stand Out Suggestions" part of the rubric, visualizations can also be provided such as bar charts)
 
