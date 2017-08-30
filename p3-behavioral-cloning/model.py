@@ -4,6 +4,7 @@ import matplotlib.image as mpimg
 import numpy as np
 from keras.models import Sequential
 from keras.layers import Flatten, Dense
+from keras.layers import Conv2D, MaxPooling2D, Cropping2D
 
 def read_data():
     lines = []
@@ -11,7 +12,7 @@ def read_data():
         reader = csv.DictReader(f) # Use the first row as keys
         for line in reader:
             lines.append(line)
-    
+
     images = []
     measurements = []
     for line in lines:
@@ -22,22 +23,31 @@ def read_data():
         images.append(image)
         measurement = float(line['steering'])
         measurements.append(measurement)
-        
+
     X_train = np.array(images)
     y_train = np.array(measurements)
-    
+
     return X_train, y_train
-    
+
 def main():
     X_train, y_train = read_data()
-    
+
     model = Sequential()
-    model.add(Flatten(input_shape=X_train.shape[1:]))
+    model.add(Cropping2D(cropping=((50,20), (0,0)), input_shape=(160,320,3)))
+    model.add(Conv2D(nb_filter=24, nb_row=5, nb_col=5, subsample=(2, 2), border_mode='valid'))
+    model.add(Conv2D(nb_filter=36, nb_row=5, nb_col=5, subsample=(2, 2), border_mode='valid'))
+    model.add(Conv2D(nb_filter=48, nb_row=5, nb_col=5, subsample=(2, 2), border_mode='valid'))
+    model.add(Conv2D(nb_filter=64, nb_row=3, nb_col=3, subsample=(1, 1), border_mode='valid'))
+    model.add(Conv2D(nb_filter=64, nb_row=3, nb_col=3, subsample=(1, 1), border_mode='valid'))
+    model.add(Flatten())
+    model.add(Dense(100))
+    model.add(Dense(50))
+    model.add(Dense(10))
     model.add(Dense(1))
-    
+
     model.compile(loss='mse', optimizer='adam')
-    model.fit(X_train, y_train, validation_split=0.2, shuffle=True, nb_epoch=2)
-    
+    model.fit(X_train, y_train, validation_split=0.2, shuffle=True, nb_epoch=10)
+
     model.save('model.h5')
 
 if __name__ == '__main__':
