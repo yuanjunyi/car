@@ -24,6 +24,7 @@ def generator(samples, batch_size=32):
                 filename = source_path.split('/')[-1]
                 current_path = 'data/IMG/' + filename
                 image = mpimg.imread(current_path)
+                image = cv2.resize(image, (160,80))
                 images.append(image)
                 steering = float(sample['steering'])
                 steerings.append(steering)
@@ -53,12 +54,11 @@ def main():
     validation_generator = generator(validation_samples, batch_size=32)
 
     model = Sequential()
-    model.add(Cropping2D(cropping=((50,20), (0,0)), input_shape=(160,320,3)))
+    model.add(Cropping2D(cropping=((25,10), (0,0)), input_shape=(80,160,3)))
     model.add(Lambda(lambda x: x/255.0-0.5))
     model.add(Conv2D(nb_filter=24, nb_row=5, nb_col=5, subsample=(2, 2), border_mode='valid'))
     model.add(Conv2D(nb_filter=36, nb_row=5, nb_col=5, subsample=(2, 2), border_mode='valid'))
     model.add(Conv2D(nb_filter=48, nb_row=5, nb_col=5, subsample=(2, 2), border_mode='valid'))
-    model.add(Conv2D(nb_filter=64, nb_row=3, nb_col=3, subsample=(1, 1), border_mode='valid'))
     model.add(Conv2D(nb_filter=64, nb_row=3, nb_col=3, subsample=(1, 1), border_mode='valid'))
     model.add(Flatten())
     model.add(Dense(100))
