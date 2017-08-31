@@ -25,6 +25,8 @@ def read_data():
         images.append(image)
         measurement = float(line['steering'])
         measurements.append(measurement)
+        images.append(np.fliplr(image))
+        measurements.append(-measurement)
 
     X_train = np.array(images)
     y_train = np.array(measurements)
