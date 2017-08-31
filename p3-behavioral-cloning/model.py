@@ -3,13 +3,15 @@ import cv2
 import matplotlib.image as mpimg
 import numpy as np
 from keras.models import Sequential
-from keras.layers import Flatten, Dense
+from keras.layers import Flatten, Dense, Lambda
 from keras.layers import Conv2D, MaxPooling2D, Cropping2D
 
 def read_data():
     lines = []
     with open('data/driving_log.csv') as f:
-        reader = csv.DictReader(f) # Use the first row as keys
+
+        # Use the first row of as keys
+        reader = csv.DictReader(f)
         for line in reader:
             lines.append(line)
 
@@ -34,6 +36,7 @@ def main():
 
     model = Sequential()
     model.add(Cropping2D(cropping=((50,20), (0,0)), input_shape=(160,320,3)))
+    model.add(Lambda(lambda x: x/255.0-0.5))
     model.add(Conv2D(nb_filter=24, nb_row=5, nb_col=5, subsample=(2, 2), border_mode='valid'))
     model.add(Conv2D(nb_filter=36, nb_row=5, nb_col=5, subsample=(2, 2), border_mode='valid'))
     model.add(Conv2D(nb_filter=48, nb_row=5, nb_col=5, subsample=(2, 2), border_mode='valid'))
@@ -46,7 +49,7 @@ def main():
     model.add(Dense(1))
 
     model.compile(loss='mse', optimizer='adam')
-    model.fit(X_train, y_train, validation_split=0.2, shuffle=True, nb_epoch=10)
+    model.fit(X_train, y_train, validation_split=0.2, shuffle=True, nb_epoch=5)
 
     model.save('model.h5')
 
