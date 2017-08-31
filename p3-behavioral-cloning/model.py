@@ -1,10 +1,12 @@
 import csv
 import cv2
-import matplotlib.image as mpimg
 import numpy as np
+import matplotlib.image as mpimg
+import matplotlib.pyplot as plt
 from keras.models import Sequential
 from keras.layers import Flatten, Dense, Lambda
 from keras.layers import Conv2D, MaxPooling2D, Cropping2D
+
 
 def read_data():
     lines = []
@@ -33,6 +35,7 @@ def read_data():
 
     return X_train, y_train
 
+
 def main():
     X_train, y_train = read_data()
 
@@ -51,9 +54,17 @@ def main():
     model.add(Dense(1))
 
     model.compile(loss='mse', optimizer='adam')
-    model.fit(X_train, y_train, validation_split=0.2, shuffle=True, nb_epoch=5)
-
+    h = model.fit(X_train, y_train, validation_split=0.2, shuffle=True, nb_epoch=5)
     model.save('model.h5')
+
+    plt.plot(h.history['loss'])
+    plt.plot(h.history['val_loss'])
+    plt.title('model mean squared error loss')
+    plt.ylabel('mean squared error loss')
+    plt.xlabel('epoch')
+    plt.legend(['training set', 'validation set'], loc='upper right')
+    plt.show()
+
 
 if __name__ == '__main__':
     main()
