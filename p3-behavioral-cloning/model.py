@@ -3,41 +3,54 @@ import cv2
 import numpy as np
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.utils import shuffle
 from keras.models import Sequential
 from keras.layers import Flatten, Dense, Lambda
 from keras.layers import Conv2D, MaxPooling2D, Cropping2D
 
 
+def generator(samples, batch_size=32):
+    num_samples = len(samples)
+    while True:
+        samples = shuffle(samples)
+        for offset in range(0, num_samples, batch_size):
+            batch_samples = samples[offset:offset+batch_size]
+
+            images = []
+            steerings = []
+            for sample in batch_samples:
+                source_path = sample['center']
+                filename = source_path.split('/')[-1]
+                current_path = 'data/IMG/' + filename
+                image = mpimg.imread(current_path)
+                images.append(image)
+                steering = float(sample['steering'])
+                steerings.append(steering)
+
+                # Augment data by flipping images.
+                images.append(np.fliplr(image))
+                steerings.append(-steering)
+
+            X = np.array(images)
+            y = np.array(steerings)
+            yield X, y
+
+
 def read_data():
     lines = []
     with open('data/driving_log.csv') as f:
-
-        # Use the first row of as keys
-        reader = csv.DictReader(f)
+        reader = csv.DictReader(f) # Use the first row as keys
         for line in reader:
             lines.append(line)
-
-    images = []
-    measurements = []
-    for line in lines:
-        source_path = line['center']
-        filename = source_path.split('/')[-1]
-        current_path = 'data/IMG/' + filename
-        image = mpimg.imread(current_path)
-        images.append(image)
-        measurement = float(line['steering'])
-        measurements.append(measurement)
-        images.append(np.fliplr(image))
-        measurements.append(-measurement)
-
-    X_train = np.array(images)
-    y_train = np.array(measurements)
-
-    return X_train, y_train
+    return lines
 
 
 def main():
-    X_train, y_train = read_data()
+    samples = read_data()
+    train_samples, validation_samples = train_test_split(samples, test_size=0.2)
+    train_generator = generator(train_samples, batch_size=32)
+    validation_generator = generator(validation_samples, batch_size=32)
 
     model = Sequential()
     model.add(Cropping2D(cropping=((50,20), (0,0)), input_shape=(160,320,3)))
@@ -54,7 +67,7 @@ def main():
     model.add(Dense(1))
 
     model.compile(loss='mse', optimizer='adam')
-    h = model.fit(X_train, y_train, validation_split=0.2, shuffle=True, nb_epoch=5)
+    h = model.fit_generator(generator=train_generator, validation_data=validation_generator, samples_per_epoch=len(train_samples), nb_val_samples=len(validation_samples), nb_epoch=5)
     model.save('model.h5')
 
     plt.plot(h.history['loss'])
