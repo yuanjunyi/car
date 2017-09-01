@@ -48,9 +48,9 @@ def read_data():
     return lines
 
 
-def resize(x):
+def resize(image):
     import tensorflow as tf
-    return tf.image.resize_images(x, (80,160))
+    return tf.image.resize_images(image, (80,160))
 
 
 def main(resume, epochs, learning_rate):
@@ -78,9 +78,7 @@ def main(resume, epochs, learning_rate):
         model.add(Dense(1))
         model.compile(loss='mse', optimizer='adam')
 
-    print('learning rate = ' + str(get_value(model.optimizer.lr)))
     set_value(model.optimizer.lr, learning_rate)
-    print('learning rate = ' + str(get_value(model.optimizer.lr)))
     h = model.fit_generator(generator=train_generator, validation_data=validation_generator, samples_per_epoch=len(train_samples), nb_val_samples=len(validation_samples), nb_epoch=epochs)
     model.save('model.h5')
 
