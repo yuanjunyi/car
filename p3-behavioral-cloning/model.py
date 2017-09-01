@@ -22,12 +22,13 @@ def generator(samples, batch_size=32):
             images = []
             steerings = []
             for sample in batch_samples:
-                source_path = sample['center']
+                # sample = [center, left, right, steering, throttle, brake, speed]
+                source_path = sample[0]
                 filename = source_path.split('/')[-1]
                 current_path = 'data/IMG/' + filename
                 image = mpimg.imread(current_path)
                 images.append(image)
-                steering = float(sample['steering'])
+                steering = float(sample[3])
                 steerings.append(steering)
 
                 # Augment data by flipping images.
@@ -42,7 +43,7 @@ def generator(samples, batch_size=32):
 def read_data():
     lines = []
     with open('data/driving_log.csv') as f:
-        reader = csv.DictReader(f) # Use the first row as keys
+        reader = csv.reader(f)
         for line in reader:
             lines.append(line)
     return lines
