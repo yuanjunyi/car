@@ -1,6 +1,7 @@
 import csv
 import cv2
 import sys
+import re
 import numpy as np
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
@@ -24,7 +25,7 @@ def generator(samples, batch_size=32):
             for sample in batch_samples:
                 # sample = [center, left, right, steering, throttle, brake, speed]
                 source_path = sample[0]
-                filename = source_path.split('/')[-1]
+                filename = re.split(r'/|\\', source_path)[-1]
                 current_path = 'data/IMG/' + filename
                 image = mpimg.imread(current_path)
                 images.append(image)
