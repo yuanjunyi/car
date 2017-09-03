@@ -24,17 +24,23 @@ def generator(samples, batch_size=32):
             steerings = []
             for sample in batch_samples:
                 # sample = [center, left, right, steering, throttle, brake, speed]
-                source_path = sample[0]
-                filename = re.split(r'/|\\', source_path)[-1]
-                current_path = 'data/IMG/' + filename
-                image = mpimg.imread(current_path)
-                images.append(image)
+                path_center = 'data/IMG/' + re.split(r'/|\\', sample[0])[-1]
+                path_left = 'data/IMG/' + re.split(r'/|\\', sample[1])[-1]
+                path_right = 'data/IMG/' + re.split(r'/|\\', sample[2])[-1]
                 steering = float(sample[3])
+
+                images.append(mpimg.imread(path_center))
                 steerings.append(steering)
+                images.append(mpimg.imread(path_left))
+                steerings.append(steering+0.05)
+                images.append(mpimg.imread(path_right))
+                steerings.append(steering-0.05)
 
                 # Augment data by flipping images.
-                images.append(np.fliplr(image))
-                steerings.append(-steering)
+                flipped_images = [np.fliplr(x) for x in images[-3:]]
+                flipped_steerings = [-x for x in steerings[-3:]]
+                images.extend(flipped_images)
+                steerings.extend(flipped_steerings)
 
             X = np.array(images)
             y = np.array(steerings)
@@ -58,8 +64,8 @@ def resize(image):
 def main(resume, epochs, learning_rate):
     samples = read_data()
     train_samples, validation_samples = train_test_split(samples, test_size=0.2)
-    train_generator = generator(train_samples, batch_size=32)
-    validation_generator = generator(validation_samples, batch_size=32)
+    train_generator = generator(train_samples, batch_size=128)
+    validation_generator = generator(validation_samples, batch_size=128)
 
     model = None
     if resume:
