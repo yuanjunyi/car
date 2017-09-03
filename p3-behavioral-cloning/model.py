@@ -32,9 +32,9 @@ def generator(data_path, samples, batch_size=32):
                 images.append(mpimg.imread(path_center))
                 steerings.append(steering)
                 images.append(mpimg.imread(path_left))
-                steerings.append(steering+0.05)
+                steerings.append(steering+0.3)
                 images.append(mpimg.imread(path_right))
-                steerings.append(steering-0.05)
+                steerings.append(steering-0.3)
 
                 # Augment data by flipping images.
                 flipped_images = [np.fliplr(x) for x in images[-3:]]
