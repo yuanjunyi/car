@@ -13,7 +13,7 @@ from keras.layers import Conv2D, MaxPooling2D, Cropping2D
 from keras.backend import get_value, set_value
 
 
-def generator(samples, batch_size=32):
+def generator(data_path, samples, batch_size=32):
     num_samples = len(samples)
     while True:
         samples = shuffle(samples)
@@ -24,9 +24,9 @@ def generator(samples, batch_size=32):
             steerings = []
             for sample in batch_samples:
                 # sample = [center, left, right, steering, throttle, brake, speed]
-                path_center = 'data/IMG/' + re.split(r'/|\\', sample[0])[-1]
-                path_left = 'data/IMG/' + re.split(r'/|\\', sample[1])[-1]
-                path_right = 'data/IMG/' + re.split(r'/|\\', sample[2])[-1]
+                path_center = data_path + '/IMG/' + re.split(r'/|\\', sample[0])[-1]
+                path_left = data_path + '/IMG/' + re.split(r'/|\\', sample[1])[-1]
+                path_right = data_path + '/IMG/' + re.split(r'/|\\', sample[2])[-1]
                 steering = float(sample[3])
 
                 images.append(mpimg.imread(path_center))
@@ -47,9 +47,9 @@ def generator(samples, batch_size=32):
             yield X, y
 
 
-def read_data():
+def read_data(data_path):
     lines = []
-    with open('data/driving_log.csv') as f:
+    with open(data_path+'/driving_log.csv') as f:
         reader = csv.reader(f)
         for line in reader:
             lines.append(line)
@@ -61,11 +61,11 @@ def resize(image):
     return tf.image.resize_images(image, (80,160))
 
 
-def main(resume, epochs, learning_rate):
-    samples = read_data()
+def main(data_path, resume, epochs, learning_rate):
+    samples = read_data(data_path)
     train_samples, validation_samples = train_test_split(samples, test_size=0.2)
-    train_generator = generator(train_samples, batch_size=128)
-    validation_generator = generator(validation_samples, batch_size=128)
+    train_generator = generator(data_path, train_samples, batch_size=128)
+    validation_generator = generator(data_path, validation_samples, batch_size=128)
 
     model = None
     if resume:
@@ -100,9 +100,12 @@ def main(resume, epochs, learning_rate):
 
 
 if __name__ == '__main__':
-    resume, epochs, learning_rate = False, 5, 0.001
-    if len(sys.argv) == 4:
-        resume = sys.argv[1] == 'resume'
-        epochs = int(sys.argv[2])
-        learning_rate = float(sys.argv[3])
-    main(resume, epochs, learning_rate)
+    data_path, resume, epochs, learning_rate = 'data', False, 5, 0.001
+    if len(sys.argv) == 2:
+        data_path = sys.argv[1]
+    if len(sys.argv) == 5:
+        data_path = sys.argv[1]
+        resume = sys.argv[2] == 'resume'
+        epochs = int(sys.argv[3])
+        learning_rate = float(sys.argv[4])
+    main(data_path, resume, epochs, learning_rate)
