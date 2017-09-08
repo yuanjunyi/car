@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 from keras.models import Sequential, load_model
-from keras.layers import Flatten, Dense, Lambda
+from keras.layers import Flatten, Dense, Lambda, Activation
 from keras.layers import Conv2D, MaxPooling2D, Cropping2D
 from keras.backend import get_value, set_value
 
@@ -75,11 +75,21 @@ def main(data_path, resume, epochs, learning_rate):
         model.add(Lambda(resize, input_shape=(160,320,3)))
         model.add(Cropping2D(cropping=((25,10), (0,0))))
         model.add(Lambda(lambda x: x/255.0-0.5))
-        model.add(Conv2D(nb_filter=24, nb_row=5, nb_col=5, subsample=(2, 2), border_mode='valid'))
-        model.add(Conv2D(nb_filter=36, nb_row=5, nb_col=5, subsample=(2, 2), border_mode='valid'))
-        model.add(Conv2D(nb_filter=48, nb_row=5, nb_col=5, subsample=(2, 2), border_mode='valid'))
-        model.add(Conv2D(nb_filter=64, nb_row=3, nb_col=3, subsample=(1, 1), border_mode='valid'))
+        model.add(Conv2D(nb_filter=16, nb_row=5, nb_col=5, subsample=(2, 2), border_mode='valid'))
+        model.add(Activation('relu'))
+        model.add(MaxPooling2D(pool_size=(2,2), strides=(1,1), border_mode='same'))
+        model.add(Conv2D(nb_filter=32, nb_row=5, nb_col=5, subsample=(2, 2), border_mode='valid'))
+        model.add(Activation('relu'))
+        model.add(MaxPooling2D(pool_size=(2,2), strides=(1,1), border_mode='same'))
+        model.add(Conv2D(nb_filter=64, nb_row=5, nb_col=5, subsample=(2, 2), border_mode='valid'))
+        model.add(Activation('relu'))
+        model.add(MaxPooling2D(pool_size=(2,2), strides=(1,1), border_mode='same'))
+        model.add(Conv2D(nb_filter=128, nb_row=3, nb_col=3, subsample=(1, 1), border_mode='valid'))
+        model.add(Activation('relu'))
+        model.add(MaxPooling2D(pool_size=(2,2), strides=(1,1), border_mode='same'))
         model.add(Flatten())
+        model.add(Dense(1000))
+        model.add(Dense(500))
         model.add(Dense(100))
         model.add(Dense(50))
         model.add(Dense(10))
