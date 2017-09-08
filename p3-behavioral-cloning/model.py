@@ -110,7 +110,7 @@ def main(data_path, resume, epochs, learning_rate):
 
 
 if __name__ == '__main__':
-    data_path, resume, epochs, learning_rate = 'data', False, 5, 0.001
+    data_path, resume, epochs, learning_rate = 'data', False, 20, 0.0001
     if len(sys.argv) == 2:
         data_path = sys.argv[1]
     if len(sys.argv) == 5:
