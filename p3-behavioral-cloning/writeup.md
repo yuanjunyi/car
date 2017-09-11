@@ -84,7 +84,7 @@ Then I realized that it was very difficult for the model to unlearn the bad beha
 
 Here is the mse of the final model on the final dataset:
 
-![alt text][image2]
+![alt text][image1]
 
 At the end of the process, the vehicle is able to drive autonomously around the track without leaving the road.
 
