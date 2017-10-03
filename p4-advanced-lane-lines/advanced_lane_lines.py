@@ -1,38 +1,46 @@
-import numpy as np
+import sys
 import cv2
+import glob
+import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-import glob
 
+def calibrate_camera(new_calibration):
+    if not new_calibration:
+        camera_matrix = np.load('camera_matrix.npy')
+        distortion_coefficients = np.load('distortion_coefficients.npy')
+        return camera_matrix, distortion_coefficients
+    else:
+        nx = 9
+        ny = 6
 
-def calibrate_camera():
-    nx = 9
-    ny = 6
+        points_3D_in_real_world = []
+        points_2D_in_image_plane = []
 
-    points_3D_in_real_world = []
-    points_2D_in_image_plane = []
+        # Define points_3D as np.float32 instead of np.float because
+        # calibrateCamera() requests Point3f.
+        points_3D = np.zeros((nx*ny, 3), np.float32)
+        points_3D[:, :2] = np.mgrid[0:nx, 0:ny].T.reshape(-1, 2)
 
-    points_3D = np.zeros((nx*ny, 3), np.float)
-    points_3D[:, :2] = np.mgrid[0:nx, 0:ny].T.reshape(-1, 2)
+        filenames = glob.glob('camera_cal/calibration*.jpg')
+        for filename in filenames:
+            image = cv2.imread(filename)
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            ret, corners = cv2.findChessboardCorners(gray, (nx, ny), None)
+            if ret == True:
+                image_shape = image.shape[0:2]
+                points_2D_in_image_plane.append(corners)
+                points_3D_in_real_world.append(points_3D)
 
-    filenames = glob.glob('camera_cal/calibration*.jpg')
-    for filename in filenames:
-        image = cv2.imread(filename)
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        ret, corners = cv2.findChessboardCorners(gray, (nx, ny), None)
-        if ret == True:
-            image_shape = image.shape[0:2]
-            points_2D_in_image_plane.append(corners)
-            points_3D_in_real_world.append(points_3D)
-
-    ret, camera_matrix, distortion_coefficients, rotation_vecs, translation_vecs = \
-        cv2.calibrateCamera(points_3D_in_real_world,
-                            points_2D_in_image_plane,
-                            image_shape,
-                            None,
-                            None)
-
-    return camera_matrix, distortion_coefficients
+        ret, camera_matrix, distortion_coefficients, rotation_vecs, translation_vecs = \
+            cv2.calibrateCamera(points_3D_in_real_world,
+                                points_2D_in_image_plane,
+                                image_shape,
+                                None,
+                                None)
+        np.save('camera_matrix.npy', camera_matrix)
+        np.save('distortion_coefficients.npy', distortion_coefficients)
+        return camera_matrix, distortion_coefficients
 
 
 def undistort_image(image, camera_matrix, distortion_coefficients):
@@ -81,12 +89,22 @@ def gradient_direction_threshold(gray, ksize=3, threshold=(0, np.pi/2)):
 
 
 if __name__ == '__main__':
+    new_calibration = False
+    if len(sys.argv) == 2:
+        new_calibration = sys.argv[1] == 'calibrate'
+    camera_matrix, distortion_coefficients = calibrate_camera(new_calibration)
+    camera_image = mpimg.imread('camera_cal/calibration9.jpg')
+    undistorted_image = undistort_image(camera_image, camera_matrix, distortion_coefficients)
+
+    f, ax = plt.subplots(1, 2, figsize=(16,8))
+    ax[0].set_title('camera_image')
+    ax[0].imshow(camera_image)
+    ax[1].set_title('undistorted_image')
+    ax[1].imshow(undistorted_image)
+
     image = mpimg.imread('test_images/test2.jpg')
     gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
 
-    # camera_matrix, distortion_coefficients = calibrate_camera()
-    # undistorted_image = undistort_image(image, camera_matrix, distortion_coefficients)
-    
     gradientx = abs_sobel_threshold(gray, orient='x', ksize=3, threshold=(20, 100))
     gradienty = abs_sobel_threshold(gray, orient='y', ksize=3, threshold=(20, 100))
     gradient_magnitude = gradient_magnitude_threshold(gray, ksize=9, threshold=(30, 100))
