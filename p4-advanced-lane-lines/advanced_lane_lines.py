@@ -88,6 +88,26 @@ def gradient_direction_threshold(gray, ksize=3, threshold=(0, np.pi/2)):
     return binary
 
 
+def perspective_transform(image):
+    # 4 source coordinates
+    src = np.float32(
+        [[194, 719],
+         [1121, 719],
+         [687, 452],
+         [587, 452]])
+
+    # 4 desired coordinates
+    dst = np.float32(
+        [[315, 719],
+         [965, 719],
+         [965, 0],
+         [315, 0]])
+    image_size = (image.shape[1], image.shape[0])
+    M = cv2.getPerspectiveTransform(src, dst)
+    warped = cv2.warpPerspective(image, M, image_size, flags=cv2.INTER_LINEAR)
+    return warped
+
+
 if __name__ == '__main__':
     new_calibration = False
     if len(sys.argv) == 2:
@@ -96,11 +116,11 @@ if __name__ == '__main__':
     camera_image = mpimg.imread('camera_cal/calibration9.jpg')
     undistorted_image = undistort_image(camera_image, camera_matrix, distortion_coefficients)
 
-    f, ax = plt.subplots(1, 2, figsize=(16,8))
-    ax[0].set_title('camera_image')
-    ax[0].imshow(camera_image)
-    ax[1].set_title('undistorted_image')
-    ax[1].imshow(undistorted_image)
+    # f, ax = plt.subplots(1, 2, figsize=(16,8))
+    # ax[0].set_title('camera_image')
+    # ax[0].imshow(camera_image)
+    # ax[1].set_title('undistorted_image')
+    # ax[1].imshow(undistorted_image)
 
     image = mpimg.imread('test_images/test2.jpg')
     gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
@@ -117,21 +137,32 @@ if __name__ == '__main__':
             ((gradientx == 1) & (gradienty == 1)) | \
             ((gradient_magnitude == 1) & (gradient_direction == 1))] = 1
 
-    f, ax = plt.subplots(2, 4, figsize=(16,8))
-    ax[0, 0].set_title('image')
-    ax[0, 0].imshow(image)
-    ax[0, 1].set_title('gray')
-    ax[0, 1].imshow(gray, cmap='gray')
-    ax[0, 2].set_title('gradientx')
-    ax[0, 2].imshow(gradientx, cmap='gray')
-    ax[0, 3].set_title('gradienty')
-    ax[0, 3].imshow(gradienty, cmap='gray')
-    ax[1, 0].set_title('gradient_magnitude')
-    ax[1, 0].imshow(gradient_magnitude, cmap='gray')
-    ax[1, 1].set_title('gradient_direction')
-    ax[1, 1].imshow(gradient_direction, cmap='gray')
-    ax[1, 2].set_title('hls_threshold')
-    ax[1, 2].imshow(hls_threshold, cmap='gray')
-    ax[1, 3].set_title('combine')
-    ax[1, 3].imshow(combine, cmap='gray')
+    # f, ax = plt.subplots(2, 4, figsize=(16,8))
+    # ax[0, 0].set_title('image')
+    # ax[0, 0].imshow(image)
+    # ax[0, 1].set_title('gray')
+    # ax[0, 1].imshow(gray, cmap='gray')
+    # ax[0, 2].set_title('gradientx')
+    # ax[0, 2].imshow(gradientx, cmap='gray')
+    # ax[0, 3].set_title('gradienty')
+    # ax[0, 3].imshow(gradienty, cmap='gray')
+    # ax[1, 0].set_title('gradient_magnitude')
+    # ax[1, 0].imshow(gradient_magnitude, cmap='gray')
+    # ax[1, 1].set_title('gradient_direction')
+    # ax[1, 1].imshow(gradient_direction, cmap='gray')
+    # ax[1, 2].set_title('hls_threshold')
+    # ax[1, 2].imshow(hls_threshold, cmap='gray')
+    # ax[1, 3].set_title('combine')
+    # ax[1, 3].imshow(combine, cmap='gray')
+
+
+    unwarped = mpimg.imread('test_images/test5.jpg')
+    warped = perspective_transform(unwarped)
+
+    f, ax = plt.subplots(1, 2, figsize=(16,8))
+    ax[0].set_title('unwarped')
+    ax[0].imshow(unwarped)
+    ax[1].set_title('warped')
+    ax[1].imshow(warped)
+
     plt.show()
