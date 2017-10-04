@@ -88,7 +88,13 @@ def gradient_direction_threshold(gray, ksize=3, threshold=(0, np.pi/2)):
     return binary
 
 
-def perspective_transform(image):
+def perspective_transform(image, M):
+    image_size = (image.shape[1], image.shape[0])
+    warped = cv2.warpPerspective(image, M, image_size, flags=cv2.INTER_LINEAR)
+    return warped
+
+
+def perspective_transform_matrix():
     # 4 source coordinates
     src = np.float32(
         [[194, 719],
@@ -102,67 +108,79 @@ def perspective_transform(image):
          [965, 719],
          [965, 0],
          [315, 0]])
-    image_size = (image.shape[1], image.shape[0])
+
     M = cv2.getPerspectiveTransform(src, dst)
-    warped = cv2.warpPerspective(image, M, image_size, flags=cv2.INTER_LINEAR)
-    return warped
+    return M
+
+
+def region_of_interest(image):
+    mask = np.zeros_like(image, np.float)
+    mask_color = 1
+    h, w = image.shape[:2]
+    vertices = np.array([[[w*0.45, h*0.6], [w*0.6, h*0.6], [w*0.95, h], [w*0.15, h]]], dtype=np.int32)
+    cv2.fillPoly(mask, vertices, mask_color)
+    masked_image = cv2.bitwise_and(image, mask)
+    return masked_image
 
 
 if __name__ == '__main__':
+
+    # Calibrate camera
     new_calibration = False
     if len(sys.argv) == 2:
         new_calibration = sys.argv[1] == 'calibrate'
     camera_matrix, distortion_coefficients = calibrate_camera(new_calibration)
-    camera_image = mpimg.imread('camera_cal/calibration9.jpg')
-    undistorted_image = undistort_image(camera_image, camera_matrix, distortion_coefficients)
 
-    # f, ax = plt.subplots(1, 2, figsize=(16,8))
-    # ax[0].set_title('camera_image')
-    # ax[0].imshow(camera_image)
-    # ax[1].set_title('undistorted_image')
-    # ax[1].imshow(undistorted_image)
-
+    # Pipeline
     image = mpimg.imread('test_images/test2.jpg')
-    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
 
+    # Undistort image
+    undistorted = undistort_image(image, camera_matrix, distortion_coefficients)
+
+    # HLS threshold
+    hls_threshold = hls_threshold(undistorted, threshold=(170, 255))
+
+    # Gradient threshold
+    gray = cv2.cvtColor(undistorted, cv2.COLOR_RGB2GRAY)
     gradientx = abs_sobel_threshold(gray, orient='x', ksize=3, threshold=(20, 100))
     gradienty = abs_sobel_threshold(gray, orient='y', ksize=3, threshold=(20, 100))
     gradient_magnitude = gradient_magnitude_threshold(gray, ksize=9, threshold=(30, 100))
     gradient_direction = gradient_direction_threshold(gray, ksize=15, threshold=(0.7, 1.3))
 
-    hls_threshold = hls_threshold(image, threshold=(170, 255))
-
-    combine = np.zeros_like(image, np.float)
+    # Combine threshold
+    combine = np.zeros_like(gray, np.float)
     combine[(hls_threshold == 1) | \
             ((gradientx == 1) & (gradienty == 1)) | \
             ((gradient_magnitude == 1) & (gradient_direction == 1))] = 1
 
-    # f, ax = plt.subplots(2, 4, figsize=(16,8))
-    # ax[0, 0].set_title('image')
-    # ax[0, 0].imshow(image)
-    # ax[0, 1].set_title('gray')
-    # ax[0, 1].imshow(gray, cmap='gray')
-    # ax[0, 2].set_title('gradientx')
-    # ax[0, 2].imshow(gradientx, cmap='gray')
-    # ax[0, 3].set_title('gradienty')
-    # ax[0, 3].imshow(gradienty, cmap='gray')
-    # ax[1, 0].set_title('gradient_magnitude')
-    # ax[1, 0].imshow(gradient_magnitude, cmap='gray')
-    # ax[1, 1].set_title('gradient_direction')
-    # ax[1, 1].imshow(gradient_direction, cmap='gray')
-    # ax[1, 2].set_title('hls_threshold')
-    # ax[1, 2].imshow(hls_threshold, cmap='gray')
-    # ax[1, 3].set_title('combine')
-    # ax[1, 3].imshow(combine, cmap='gray')
+    # Filter uninteresting region
+    interesting_region = region_of_interest(combine)
 
+    # Perspective transform
+    M = perspective_transform_matrix()
+    warped = perspective_transform(interesting_region, M)
 
-    unwarped = mpimg.imread('test_images/test5.jpg')
-    warped = perspective_transform(unwarped)
-
-    f, ax = plt.subplots(1, 2, figsize=(16,8))
-    ax[0].set_title('unwarped')
-    ax[0].imshow(unwarped)
-    ax[1].set_title('warped')
-    ax[1].imshow(warped)
-
+    f, ax = plt.subplots(3, 4, figsize=(16,8))
+    ax[0, 0].set_title('image')
+    ax[0, 0].imshow(image)
+    ax[0, 1].set_title('undistorted')
+    ax[0, 1].imshow(undistorted)
+    ax[0, 2].set_title('hls_threshold')
+    ax[0, 2].imshow(hls_threshold, cmap='gray')
+    ax[0, 3].set_title('gray')
+    ax[0, 3].imshow(gray, cmap='gray')
+    ax[1, 0].set_title('gradientx')
+    ax[1, 0].imshow(gradientx, cmap='gray')
+    ax[1, 1].set_title('gradienty')
+    ax[1, 1].imshow(gradienty, cmap='gray')
+    ax[1, 2].set_title('gradient_magnitude')
+    ax[1, 2].imshow(gradient_magnitude, cmap='gray')
+    ax[1, 3].set_title('gradient_direction')
+    ax[1, 3].imshow(gradient_direction, cmap='gray')
+    ax[2, 0].set_title('combine')
+    ax[2, 0].imshow(combine, cmap='gray')
+    ax[2, 1].set_title('interesting_region')
+    ax[2, 1].imshow(interesting_region, cmap='gray')
+    ax[2, 2].set_title('warped')
+    ax[2, 2].imshow(warped, cmap='gray')
     plt.show()
