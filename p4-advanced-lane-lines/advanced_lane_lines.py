@@ -213,15 +213,6 @@ def find_lines(binary_warped):
     left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
     right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
 
-    out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [1, 0, 0]
-    out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 1]
-    plt.figure()
-    plt.imshow(out_img)
-    plt.plot(left_fitx, ploty, color='yellow')
-    plt.plot(right_fitx, ploty, color='yellow')
-    plt.xlim(0, 1280)
-    plt.ylim(720, 0)
-
     # Define conversions in x and y from pixels space to meters
     ym_per_pix = 30 / 720
     xm_per_pix = 3.7 / 700
@@ -235,8 +226,29 @@ def find_lines(binary_warped):
     left_curverad = ((1 + (2*left_fit_cr[0]*y_eval*ym_per_pix + left_fit_cr[1])**2)**1.5) / np.absolute(2*left_fit_cr[0])
     right_curverad = ((1 + (2*right_fit_cr[0]*y_eval*ym_per_pix + right_fit_cr[1])**2)**1.5) / np.absolute(2*right_fit_cr[0])
 
-    # Now our radius of curvature is in meters
-    print(left_curverad, 'm', right_curverad, 'm')
+    curverad = (left_curverad + right_curverad) / 2
+    curverad_text = 'Radius of curvature = %dm' % curverad
+
+    leftx_bottom = left_fit[0]*y_eval**2 + left_fit[1]*y_eval + left_fit[2]
+    rightx_bottom = right_fit[0]*y_eval**2 + right_fit[1]*y_eval + right_fit[2]
+    lane_center = (leftx_bottom + rightx_bottom) / 2
+    offset = np.absolute(lane_center-w/2) * xm_per_pix
+    if lane_center < w/2:
+        position_text = 'Vehicle is %.2fm left of center' % offset
+    else:
+        position_text = 'Vehicle is %.2fm right of center' % offset
+
+    # Draw output image
+    out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [1, 0, 0]
+    out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 1]
+    cv2.putText(out_img, curverad_text, (50,50), cv2.FONT_HERSHEY_SIMPLEX, 2, (1,1,1), 2, cv2.LINE_AA)
+    cv2.putText(out_img, position_text, (50,100), cv2.FONT_HERSHEY_SIMPLEX, 2, (1,1,1), 2, cv2.LINE_AA)
+    plt.figure()
+    plt.imshow(out_img)
+    plt.plot(left_fitx, ploty, color='yellow')
+    plt.plot(right_fitx, ploty, color='yellow')
+    plt.xlim(0, 1280)
+    plt.ylim(720, 0)
 
 
 def pipeline(image, detail):
