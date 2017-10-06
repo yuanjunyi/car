@@ -111,7 +111,8 @@ def perspective_transform_matrix():
          [315, 0]])
 
     M = cv2.getPerspectiveTransform(src, dst)
-    return M
+    Minv = cv2.getPerspectiveTransform(dst, src)
+    return M, Minv
 
 
 def region_of_interest(image):
@@ -239,16 +240,18 @@ def find_lines(binary_warped):
         position_text = 'Vehicle is %.2fm right of center' % offset
 
     # Draw output image
-    out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [1, 0, 0]
-    out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 1]
-    cv2.putText(out_img, curverad_text, (50,50), cv2.FONT_HERSHEY_SIMPLEX, 2, (1,1,1), 2, cv2.LINE_AA)
-    cv2.putText(out_img, position_text, (50,100), cv2.FONT_HERSHEY_SIMPLEX, 2, (1,1,1), 2, cv2.LINE_AA)
-    plt.figure()
-    plt.imshow(out_img)
-    plt.plot(left_fitx, ploty, color='yellow')
-    plt.plot(right_fitx, ploty, color='yellow')
-    plt.xlim(0, 1280)
-    plt.ylim(720, 0)
+    # out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [1, 0, 0]
+    # out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 1]
+    # cv2.putText(out_img, curverad_text, (50,50), cv2.FONT_HERSHEY_SIMPLEX, 2, (1,1,1), 2, cv2.LINE_AA)
+    # cv2.putText(out_img, position_text, (50,100), cv2.FONT_HERSHEY_SIMPLEX, 2, (1,1,1), 2, cv2.LINE_AA)
+    # plt.figure()
+    # plt.imshow(out_img)
+    # plt.plot(left_fitx, ploty, color='yellow')
+    # plt.plot(right_fitx, ploty, color='yellow')
+    # plt.xlim(0, 1280)
+    # plt.ylim(720, 0)
+
+    return ploty, left_fitx, right_fitx
 
 
 def pipeline(image, detail):
@@ -275,11 +278,11 @@ def pipeline(image, detail):
     interesting_region = region_of_interest(combine)
 
     # Perspective transform
-    M = perspective_transform_matrix()
+    M, Minv = perspective_transform_matrix()
     warped = perspective_transform(interesting_region, M)
 
     # Find lines
-    find_lines(warped)
+    ploty, left_fitx, right_fitx = find_lines(warped)
 
     if detail:
         f, ax = plt.subplots(3, 4, figsize=(16,8))
@@ -305,6 +308,28 @@ def pipeline(image, detail):
         ax[2, 1].imshow(interesting_region, cmap='gray')
         ax[2, 2].set_title('warped')
         ax[2, 2].imshow(warped, cmap='gray')
+    return warped, undistorted, Minv, ploty, left_fitx, right_fitx
+
+
+def project_lane_lines(image, undistorted, warped, Minv, ploty, left_fitx, right_fitx):
+    # Create an image to draw the lines on
+    warp_zero = np.zeros_like(warped).astype(np.uint8)
+    color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
+
+    # Recast the x and y points into usable format for cv2.fillPoly()
+    pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
+    pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
+    pts = np.hstack((pts_left, pts_right))
+
+    # Draw the lane onto the warped blank image
+    cv2.fillPoly(color_warp, np.int_([pts]), (0,255, 0))
+
+    # Warp the blank back to original image space using inverse perspective matrix (Minv)
+    newwarp = cv2.warpPerspective(color_warp, Minv, (image.shape[1], image.shape[0]))
+    # Combine the result with the original image
+    result = cv2.addWeighted(undistorted, 1, newwarp, 0.3, 0)
+    plt.figure()
+    plt.imshow(result)
 
 
 if __name__ == '__main__':
@@ -318,6 +343,7 @@ if __name__ == '__main__':
     filenames = glob.glob('test_images/test*.jpg')
     for filename in filenames:
         image = mpimg.imread(filename)
-        pipeline(image, False)
+        warped, undistorted, Minv, ploty, left_fitx, right_fitx = pipeline(image, False)
+        project_lane_lines(image, undistorted, warped, Minv, ploty, left_fitx, right_fitx)
 
     plt.show()
