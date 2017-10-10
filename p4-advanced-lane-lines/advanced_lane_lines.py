@@ -4,44 +4,72 @@ import glob
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+from moviepy.editor import VideoFileClip
 
 
-def calibrate_camera(new_calibration):
-    if not new_calibration:
-        camera_matrix = np.load('camera_matrix.npy')
-        distortion_coefficients = np.load('distortion_coefficients.npy')
-        return camera_matrix, distortion_coefficients
-    else:
-        nx = 9
-        ny = 6
+class Line():
+    def __init__(self):
+        self.current_fit = None
+        self.previous_fit = None
+        self.recent_fits = []
 
-        points_3D_in_real_world = []
-        points_2D_in_image_plane = []
+    def prepare_for_next_frame(self):
+        self.previous_fit = self.current_fit
+        self.current_fit = None
 
-        # Define points_3D as np.float32 instead of np.float because
-        # calibrateCamera() requests Point3f.
-        points_3D = np.zeros((nx*ny, 3), np.float32)
-        points_3D[:, :2] = np.mgrid[0:nx, 0:ny].T.reshape(-1, 2)
+    def set_current_fit(self, fit):
+        self.current_fit = fit
+        self.recent_fits.append(self.current_fit)
+        if len(self.recent_fits) > 10:
+            self.recent_fits.pop(0)
 
-        filenames = glob.glob('camera_cal/calibration*.jpg')
-        for filename in filenames:
-            image = cv2.imread(filename)
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            ret, corners = cv2.findChessboardCorners(gray, (nx, ny), None)
-            if ret == True:
-                image_shape = image.shape[0:2]
-                points_2D_in_image_plane.append(corners)
-                points_3D_in_real_world.append(points_3D)
+    def get_previous_fit(self):
+        return self.previous_fit
 
-        ret, camera_matrix, distortion_coefficients, rotation_vecs, translation_vecs = \
-            cv2.calibrateCamera(points_3D_in_real_world,
-                                points_2D_in_image_plane,
-                                image_shape,
-                                None,
-                                None)
-        np.save('camera_matrix.npy', camera_matrix)
-        np.save('distortion_coefficients.npy', distortion_coefficients)
-        return camera_matrix, distortion_coefficients
+    def get_smooth_fit(self):
+        if self.recent_fits:
+            return np.mean(self.recent_fits, axis=0)
+        else:
+            return None
+
+
+left_line = Line()
+right_line = Line()
+
+
+def load_camera_calibration():
+    camera_matrix = np.load('camera_matrix.npy')
+    distortion_coefficients = np.load('distortion_coefficients.npy')
+    return camera_matrix, distortion_coefficients
+
+
+def calibrate_camera():
+    nx = 9
+    ny = 6
+    points_3D_in_real_world = []
+    points_2D_in_image_plane = []
+    # Define points_3D as np.float32 instead of np.float because
+    # calibrateCamera() requests Point3f.
+    points_3D = np.zeros((nx*ny, 3), np.float32)
+    points_3D[:, :2] = np.mgrid[0:nx, 0:ny].T.reshape(-1, 2)
+    filenames = glob.glob('camera_cal/calibration*.jpg')
+    for filename in filenames:
+        image = cv2.imread(filename)
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        ret, corners = cv2.findChessboardCorners(gray, (nx, ny), None)
+        if ret == True:
+            image_shape = image.shape[0:2]
+            points_2D_in_image_plane.append(corners)
+            points_3D_in_real_world.append(points_3D)
+    ret, camera_matrix, distortion_coefficients, rotation_vecs, translation_vecs = \
+        cv2.calibrateCamera(points_3D_in_real_world,
+                            points_2D_in_image_plane,
+                            image_shape,
+                            None,
+                            None)
+    np.save('camera_matrix.npy', camera_matrix)
+    np.save('distortion_coefficients.npy', distortion_coefficients)
+    return camera_matrix, distortion_coefficients
 
 
 def undistort_image(image, camera_matrix, distortion_coefficients):
@@ -125,13 +153,56 @@ def region_of_interest(image):
     return masked_image
 
 
-def find_lines(binary_warped):
+def compute_curvature(pixel_pos_x, pixel_pos_y, y_eval):
+    # Define conversions from pixels space to meters
+    m_per_pixel_y = 30 / 720
+    m_per_pixel_x = 3.7 / 700
+
+    # Fit polynomials to (x, y) in world space
+    fit = np.polyfit(pixel_pos_y*m_per_pixel_y, pixel_pos_x*m_per_pixel_x, 2)
+    curvature = ((1 + (2*fit[0]*y_eval*m_per_pixel_y + fit[1])**2)**1.5) / np.absolute(2*fit[0])
+    return curvature
+
+
+def find_lane_lines_using_previous_frame(binary_warped, previous_left_fit, previous_right_fit):
+    margin = 100
+    nonzero = binary_warped.nonzero()
+    nonzeroy = np.array(nonzero[0])
+    nonzerox = np.array(nonzero[1])
+    previous_left_x = previous_left_fit[0]*nonzeroy**2 + \
+                      previous_left_fit[1]*nonzeroy + \
+                      previous_left_fit[2]
+    left_lane_inds = ((nonzerox > previous_left_x - margin) &
+                      (nonzerox < previous_left_x + margin))
+
+    previous_right_x = previous_right_fit[0]*nonzeroy**2 + \
+                       previous_right_fit[1]*nonzeroy + \
+                       previous_right_fit[2]
+    right_lane_inds = ((nonzerox > previous_right_x - margin) &
+                      (nonzerox < previous_right_x + margin))
+    
+    # Extract left and right line pixel positions
+    leftx = nonzerox[left_lane_inds]
+    lefty = nonzeroy[left_lane_inds] 
+    rightx = nonzerox[right_lane_inds]
+    righty = nonzeroy[right_lane_inds]
+
+    # Fit a second order polynomial to each
+    left_fit = np.polyfit(lefty, leftx, 2)
+    right_fit = np.polyfit(righty, rightx, 2)
+
+    # Compute curvature in world space
+    h, w = binary_warped.shape[:2]
+    left_curvature = (leftx, lefty, h-1)
+    right_curvature = (rightx, righty, h-1)
+
+    return left_fit, right_fit, left_curvature, right_curvature
+
+
+def find_lane_lines_from_scratch(binary_warped):
     # Take a histogram of the bottom half of the image
     h, w = binary_warped.shape[:2]
     histogram = np.sum(binary_warped[int(h/2):,:], axis=0)
-
-    # Create an output image to draw on and  visualize the result
-    out_img = np.dstack((binary_warped, binary_warped, binary_warped))
 
     # Find the peak of the left and right halves of the histogram
     # These will be the starting point for the left and right lines
@@ -170,12 +241,6 @@ def find_lines(binary_warped):
         win_xright_low = rightx_current - margin
         win_xright_high = rightx_current + margin
 
-        # Draw the windows on the visualization image
-        cv2.rectangle(
-            out_img, (win_xleft_low,win_y_low), (win_xleft_high,win_y_high), (0,1,0), 2)
-        cv2.rectangle(
-            out_img, (win_xright_low,win_y_low), (win_xright_high,win_y_high), (0,1,0), 2)
-
         # Identify the nonzero pixels in x and y within the window
         good_left_inds = \
             ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) &
@@ -209,52 +274,14 @@ def find_lines(binary_warped):
     left_fit = np.polyfit(lefty, leftx, 2)
     right_fit = np.polyfit(righty, rightx, 2)
 
-    # Generate x and y values for plotting
-    ploty = np.linspace(0, h-1, h)
-    left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
-    right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
+    # Compute curvature in world space
+    left_curvature = (leftx, lefty, h-1)
+    right_curvature = (rightx, righty, h-1)
 
-    # Define conversions in x and y from pixels space to meters
-    ym_per_pix = 30 / 720
-    xm_per_pix = 3.7 / 700
-
-    # Fit new polynomials to x,y in world space
-    left_fit_cr = np.polyfit(lefty*ym_per_pix, leftx*xm_per_pix, 2)
-    right_fit_cr = np.polyfit(righty*ym_per_pix, rightx*xm_per_pix, 2)
-
-    # Calculate the new radii of curvature
-    y_eval = np.max(ploty)
-    left_curverad = ((1 + (2*left_fit_cr[0]*y_eval*ym_per_pix + left_fit_cr[1])**2)**1.5) / np.absolute(2*left_fit_cr[0])
-    right_curverad = ((1 + (2*right_fit_cr[0]*y_eval*ym_per_pix + right_fit_cr[1])**2)**1.5) / np.absolute(2*right_fit_cr[0])
-
-    curverad = (left_curverad + right_curverad) / 2
-    curverad_text = 'Radius of curvature = %dm' % curverad
-
-    leftx_bottom = left_fit[0]*y_eval**2 + left_fit[1]*y_eval + left_fit[2]
-    rightx_bottom = right_fit[0]*y_eval**2 + right_fit[1]*y_eval + right_fit[2]
-    lane_center = (leftx_bottom + rightx_bottom) / 2
-    offset = np.absolute(lane_center-w/2) * xm_per_pix
-    if lane_center < w/2:
-        position_text = 'Vehicle is %.2fm left of center' % offset
-    else:
-        position_text = 'Vehicle is %.2fm right of center' % offset
-
-    # Draw output image
-    # out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [1, 0, 0]
-    # out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 1]
-    # cv2.putText(out_img, curverad_text, (50,50), cv2.FONT_HERSHEY_SIMPLEX, 2, (1,1,1), 2, cv2.LINE_AA)
-    # cv2.putText(out_img, position_text, (50,100), cv2.FONT_HERSHEY_SIMPLEX, 2, (1,1,1), 2, cv2.LINE_AA)
-    # plt.figure()
-    # plt.imshow(out_img)
-    # plt.plot(left_fitx, ploty, color='yellow')
-    # plt.plot(right_fitx, ploty, color='yellow')
-    # plt.xlim(0, 1280)
-    # plt.ylim(720, 0)
-
-    return ploty, left_fitx, right_fitx
+    return left_fit, right_fit, left_curvature, right_curvature
 
 
-def pipeline(image, detail):
+def pipeline(image, camera_matrix, distortion_coefficients):
     # Undistort image
     undistorted = undistort_image(image, camera_matrix, distortion_coefficients)
 
@@ -279,41 +306,33 @@ def pipeline(image, detail):
 
     # Perspective transform
     M, Minv = perspective_transform_matrix()
-    warped = perspective_transform(interesting_region, M)
-
-    # Find lines
-    ploty, left_fitx, right_fitx = find_lines(warped)
-
-    if detail:
-        f, ax = plt.subplots(3, 4, figsize=(16,8))
-        ax[0, 0].set_title('image')
-        ax[0, 0].imshow(image)
-        ax[0, 1].set_title('undistorted')
-        ax[0, 1].imshow(undistorted)
-        ax[0, 2].set_title('hls_threshold')
-        ax[0, 2].imshow(hls_threshold, cmap='gray')
-        ax[0, 3].set_title('gray')
-        ax[0, 3].imshow(gray, cmap='gray')
-        ax[1, 0].set_title('gradientx')
-        ax[1, 0].imshow(gradientx, cmap='gray')
-        ax[1, 1].set_title('gradienty')
-        ax[1, 1].imshow(gradienty, cmap='gray')
-        ax[1, 2].set_title('gradient_magnitude')
-        ax[1, 2].imshow(gradient_magnitude, cmap='gray')
-        ax[1, 3].set_title('gradient_direction')
-        ax[1, 3].imshow(gradient_direction, cmap='gray')
-        ax[2, 0].set_title('combine')
-        ax[2, 0].imshow(combine, cmap='gray')
-        ax[2, 1].set_title('interesting_region')
-        ax[2, 1].imshow(interesting_region, cmap='gray')
-        ax[2, 2].set_title('warped')
-        ax[2, 2].imshow(warped, cmap='gray')
-    return warped, undistorted, Minv, ploty, left_fitx, right_fitx
+    binary_warped = perspective_transform(interesting_region, M)
+    return binary_warped, undistorted, Minv
 
 
-def project_lane_lines(image, undistorted, warped, Minv, ploty, left_fitx, right_fitx):
+def find_lane_lines(binary_warped):
+    left_line.prepare_for_next_frame()
+    right_line.prepare_for_next_frame()
+    previous_left_fit = left_line.get_previous_fit()
+    previous_right_fit = right_line.get_previous_fit()
+    if previous_left_fit is None or previous_right_fit is None:
+        left_fit, right_fit, left_curvature, right_curvature = find_lane_lines_from_scratch(binary_warped)
+    else:
+        left_fit, right_fit, left_curvature, right_curvature = find_lane_lines_using_previous_frame(binary_warped, previous_left_fit, previous_right_fit)
+    left_line.set_current_fit(left_fit)
+    right_line.set_current_fit(right_fit)
+
+
+def project_lane_lines(image, undistorted, binary_warped, Minv):
+    h, w = binary_warped.shape[:2]
+    ploty = np.linspace(0, h-1, h)
+    left_fit = left_line.get_smooth_fit()
+    right_fit = right_line.get_smooth_fit()
+    left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
+    right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
+
     # Create an image to draw the lines on
-    warp_zero = np.zeros_like(warped).astype(np.uint8)
+    warp_zero = np.zeros_like(binary_warped).astype(np.uint8)
     color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
 
     # Recast the x and y points into usable format for cv2.fillPoly()
@@ -328,22 +347,23 @@ def project_lane_lines(image, undistorted, warped, Minv, ploty, left_fitx, right
     newwarp = cv2.warpPerspective(color_warp, Minv, (image.shape[1], image.shape[0]))
     # Combine the result with the original image
     result = cv2.addWeighted(undistorted, 1, newwarp, 0.3, 0)
-    plt.figure()
-    plt.imshow(result)
+    return result
+
+
+def process(image):
+    camera_matrix, distortion_coefficients = load_camera_calibration()
+    binary_warped, undistorted, Minv = pipeline(image, camera_matrix, distortion_coefficients)
+    find_lane_lines(binary_warped)
+    annotated =  project_lane_lines(image, undistorted, binary_warped, Minv)
+    return annotated
 
 
 if __name__ == '__main__':
+    # Calibrate camera again when necessary
+    if len(sys.argv) == 2 and sys.argv[1] == 'cal':
+        calibrate_camera()
 
-    # Calibrate camera
-    new_calibration = False
-    if len(sys.argv) == 2:
-        new_calibration = sys.argv[1] == 'calibrate'
-    camera_matrix, distortion_coefficients = calibrate_camera(new_calibration)
-
-    filenames = glob.glob('test_images/test*.jpg')
-    for filename in filenames:
-        image = mpimg.imread(filename)
-        warped, undistorted, Minv, ploty, left_fitx, right_fitx = pipeline(image, False)
-        project_lane_lines(image, undistorted, warped, Minv, ploty, left_fitx, right_fitx)
-
-    plt.show()
+    output_path  = 'test_videos_output/project_video.mp4'
+    input_clip = VideoFileClip("project_video.mp4")
+    output_clip = input_clip.fl_image(process)
+    output_clip.write_videofile(output_path, audio=False)
