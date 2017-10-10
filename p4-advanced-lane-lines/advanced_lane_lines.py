@@ -9,9 +9,13 @@ from moviepy.editor import VideoFileClip
 
 class Line():
     def __init__(self):
+        self.reset()
+
+    def reset(self):
         self.current_fit = None
         self.previous_fit = None
         self.recent_fits = []
+        self.skip_count = 0        
 
     def prepare_for_next_frame(self):
         self.previous_fit = self.current_fit
@@ -20,7 +24,7 @@ class Line():
     def set_current_fit(self, fit):
         self.current_fit = fit
         self.recent_fits.append(self.current_fit)
-        if len(self.recent_fits) > 10:
+        if len(self.recent_fits) > 50:
             self.recent_fits.pop(0)
 
     def get_previous_fit(self):
@@ -31,6 +35,18 @@ class Line():
             return np.mean(self.recent_fits, axis=0)
         else:
             return None
+
+    def skip(self):
+        self.skip_count += 1
+        if self.skip_count == 5:
+            self.skip_count = 0
+            self.reset()
+        else:
+            self.current_fit = self.previous_fit
+            if self.recent_fits:
+                self.previous_fit = self.recent_fits.pop()
+            else:
+                self.previous_fit = None
 
 
 left_line = Line()
@@ -193,8 +209,8 @@ def find_lane_lines_using_previous_frame(binary_warped, previous_left_fit, previ
 
     # Compute curvature in world space
     h, w = binary_warped.shape[:2]
-    left_curvature = (leftx, lefty, h-1)
-    right_curvature = (rightx, righty, h-1)
+    left_curvature = compute_curvature(leftx, lefty, h)
+    right_curvature = compute_curvature(rightx, righty, h)
 
     return left_fit, right_fit, left_curvature, right_curvature
 
@@ -275,8 +291,8 @@ def find_lane_lines_from_scratch(binary_warped):
     right_fit = np.polyfit(righty, rightx, 2)
 
     # Compute curvature in world space
-    left_curvature = (leftx, lefty, h-1)
-    right_curvature = (rightx, righty, h-1)
+    left_curvature = compute_curvature(leftx, lefty, h-1)
+    right_curvature = compute_curvature(rightx, righty, h-1)
 
     return left_fit, right_fit, left_curvature, right_curvature
 
@@ -310,6 +326,33 @@ def pipeline(image, camera_matrix, distortion_coefficients):
     return binary_warped, undistorted, Minv
 
 
+def sanity_check(binary_warped, left_fit, right_fit, left_curvature, right_curvature):
+    return True
+    # h, w = binary_warped.shape[:2]
+    # distance_threshold = 600
+
+    # y_low, y_mid, y_high = int(h*0.1), int(h*0.5), int(h*0.9)
+
+    # x_left_low = left_fit[0]*y_low**2 + left_fit[1]*y_low + left_fit[2]
+    # x_left_mid = left_fit[0]*y_mid**2 + left_fit[1]*y_mid + left_fit[2]
+    # x_left_high = left_fit[0]*y_high**2 + left_fit[1]*y_high + left_fit[2]
+
+    # x_right_low = right_fit[0]*y_low**2 + right_fit[1]*y_low + right_fit[2]
+    # x_right_mid = right_fit[0]*y_mid**2 + right_fit[1]*y_mid + right_fit[2]
+    # x_right_high = right_fit[0]*y_high**2 + right_fit[1]*y_high + right_fit[2]
+
+    # distance_low = x_right_low - x_left_low
+    # distance_mid = x_right_mid - x_left_mid
+    # distance_high = x_right_high - x_left_high
+
+    # return distance_low > distance_threshold * 0.8 and \
+    #        distance_low < distance_threshold * 1.2 and \
+    #        distance_mid > distance_threshold * 0.8 and \
+    #        distance_mid < distance_threshold * 1.2 and \
+    #        distance_high > distance_threshold * 0.8 and \
+    #        distance_high < distance_threshold * 1.2
+
+
 def find_lane_lines(binary_warped):
     left_line.prepare_for_next_frame()
     right_line.prepare_for_next_frame()
@@ -319,8 +362,16 @@ def find_lane_lines(binary_warped):
         left_fit, right_fit, left_curvature, right_curvature = find_lane_lines_from_scratch(binary_warped)
     else:
         left_fit, right_fit, left_curvature, right_curvature = find_lane_lines_using_previous_frame(binary_warped, previous_left_fit, previous_right_fit)
-    left_line.set_current_fit(left_fit)
-    right_line.set_current_fit(right_fit)
+
+    # print('left=%f\t\tright=%f' % (left_curvature, right_curvature))
+
+    if sanity_check(binary_warped, left_fit, right_fit, left_curvature, right_curvature):
+        left_line.set_current_fit(left_fit)
+        right_line.set_current_fit(right_fit)
+    else:
+        print('left=%f\t\tright=%f' % (left_curvature, right_curvature))
+        left_line.skip()
+        right_line.skip()
 
 
 def project_lane_lines(image, undistorted, binary_warped, Minv):
@@ -328,6 +379,10 @@ def project_lane_lines(image, undistorted, binary_warped, Minv):
     ploty = np.linspace(0, h-1, h)
     left_fit = left_line.get_smooth_fit()
     right_fit = right_line.get_smooth_fit()
+    
+    if left_fit is None or right_fit is None:
+        return undistorted
+
     left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
     right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
 
@@ -354,7 +409,7 @@ def process(image):
     camera_matrix, distortion_coefficients = load_camera_calibration()
     binary_warped, undistorted, Minv = pipeline(image, camera_matrix, distortion_coefficients)
     find_lane_lines(binary_warped)
-    annotated =  project_lane_lines(image, undistorted, binary_warped, Minv)
+    annotated = project_lane_lines(image, undistorted, binary_warped, Minv)
     return annotated
 
 
@@ -364,6 +419,6 @@ if __name__ == '__main__':
         calibrate_camera()
 
     output_path  = 'test_videos_output/project_video.mp4'
-    input_clip = VideoFileClip("project_video.mp4")
+    input_clip = VideoFileClip("project_video.mp4").subclip(20, 25)
     output_clip = input_clip.fl_image(process)
     output_clip.write_videofile(output_path, audio=False)
