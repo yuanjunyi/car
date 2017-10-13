@@ -9,13 +9,9 @@ from moviepy.editor import VideoFileClip
 
 class Line():
     def __init__(self):
-        self.reset()
-
-    def reset(self):
         self.current_fit = None
         self.previous_fit = None
         self.recent_fits = []
-        self.skip_count = 0        
 
     def prepare_for_next_frame(self):
         self.previous_fit = self.current_fit
@@ -24,7 +20,7 @@ class Line():
     def set_current_fit(self, fit):
         self.current_fit = fit
         self.recent_fits.append(self.current_fit)
-        if len(self.recent_fits) > 50:
+        if len(self.recent_fits) > 2:
             self.recent_fits.pop(0)
 
     def get_previous_fit(self):
@@ -34,19 +30,11 @@ class Line():
         if self.recent_fits:
             return np.mean(self.recent_fits, axis=0)
         else:
+            print('recent fits is empty')
             return None
 
     def skip(self):
-        self.skip_count += 1
-        if self.skip_count == 5:
-            self.skip_count = 0
-            self.reset()
-        else:
-            self.current_fit = self.previous_fit
-            if self.recent_fits:
-                self.previous_fit = self.recent_fits.pop()
-            else:
-                self.previous_fit = None
+        print('skip this frame')
 
 
 left_line = Line()
@@ -92,11 +80,18 @@ def undistort_image(image, camera_matrix, distortion_coefficients):
     return cv2.undistort(image, camera_matrix, distortion_coefficients, None, camera_matrix)
 
 
-def color_threshold(image, threshold=(0, 255)):
+def hls_threshold(image, threshold=(0, 255)):
     hls = cv2.cvtColor(image, cv2.COLOR_RGB2HLS)
     s_channel = hls[:,:,2]
     binary = np.zeros_like(s_channel, np.float)
     binary[(threshold[0] <= s_channel) & (s_channel <= threshold[1])] = 1
+    return binary
+
+
+def grayscale_threshold(image, threshold=(0, 255)):
+    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    binary = np.zeros_like(gray, np.float)
+    binary[(threshold[0] <= gray) & (gray <= threshold[1])] = 1
     return binary
 
 
@@ -142,17 +137,17 @@ def perspective_transform(image, M):
 def perspective_transform_matrix():
     # 4 source coordinates
     src = np.float32(
-        [[194, 719],
-         [1121, 719],
-         [687, 452],
-         [587, 452]])
+        [[591, 450],
+         [687, 450],
+         [1115, 720],
+         [190, 720]])
 
     # 4 desired coordinates
     dst = np.float32(
-        [[315, 719],
-         [965, 719],
-         [965, 0],
-         [315, 0]])
+        [[280, 0],
+         [1010, 0],
+         [1010, 720],
+         [280, 720]])
 
     M = cv2.getPerspectiveTransform(src, dst)
     Minv = cv2.getPerspectiveTransform(dst, src)
@@ -215,7 +210,7 @@ def find_lane_lines_using_previous_frame(binary_warped, previous_left_fit, previ
     return left_fit, right_fit, left_curvature, right_curvature
 
 
-def find_lane_lines_from_scratch(binary_warped):
+def find_lane_lines_from_scratch(binary_warped, display=False):
     # Take a histogram of the bottom half of the image
     h, w = binary_warped.shape[:2]
     histogram = np.sum(binary_warped[int(h/2):,:], axis=0)
@@ -248,6 +243,10 @@ def find_lane_lines_from_scratch(binary_warped):
     left_lane_inds = []
     right_lane_inds = []
 
+    if display:
+        # Create an output image to draw on and  visualize the result       
+        out_img = np.dstack((binary_warped, binary_warped, binary_warped))
+
     for window in range(nwindows):
         # Identify window boundaries in x and y (and right and left)
         win_y_low = h - (window+1) * window_height
@@ -256,6 +255,12 @@ def find_lane_lines_from_scratch(binary_warped):
         win_xleft_high = leftx_current + margin
         win_xright_low = rightx_current - margin
         win_xright_high = rightx_current + margin
+
+        if display:
+            cv2.rectangle(     
+            out_img, (win_xleft_low,win_y_low), (win_xleft_high,win_y_high), (0,1,0), 2)      
+            cv2.rectangle(        
+            out_img, (win_xright_low,win_y_low), (win_xright_high,win_y_high), (0,1,0), 2)
 
         # Identify the nonzero pixels in x and y within the window
         good_left_inds = \
@@ -294,15 +299,24 @@ def find_lane_lines_from_scratch(binary_warped):
     left_curvature = compute_curvature(leftx, lefty, h-1)
     right_curvature = compute_curvature(rightx, righty, h-1)
 
+    if display:
+        # Draw output image     
+        out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [1, 0, 0]     
+        out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 1]
+        plt.imshow(out_img)
+
     return left_fit, right_fit, left_curvature, right_curvature
 
 
-def pipeline(image, camera_matrix, distortion_coefficients):
+def pipeline(image, camera_matrix, distortion_coefficients, display=False):
     # Undistort image
     undistorted = undistort_image(image, camera_matrix, distortion_coefficients)
 
     # HLS threshold
-    hls_threshold = color_threshold(undistorted, threshold=(170, 255))
+    hls_binary = hls_threshold(undistorted, threshold=(170, 255))
+
+    # Grayscale threshold
+    grayscale_binary = grayscale_threshold(undistorted, threshold=(20, 255))
 
     # Gradient threshold
     gray = cv2.cvtColor(undistorted, cv2.COLOR_RGB2GRAY)
@@ -311,46 +325,78 @@ def pipeline(image, camera_matrix, distortion_coefficients):
     gradient_magnitude = gradient_magnitude_threshold(gray, ksize=9, threshold=(30, 100))
     gradient_direction = gradient_direction_threshold(gray, ksize=15, threshold=(0.7, 1.3))
 
-    # Combine threshold
     combine = np.zeros_like(gray, np.float)
-    combine[(hls_threshold == 1) | \
+    combine[((hls_binary == 1) & (grayscale_binary == 1))| \
             ((gradientx == 1) & (gradienty == 1)) | \
             ((gradient_magnitude == 1) & (gradient_direction == 1))] = 1
 
     # Filter uninteresting region
-    interesting_region = region_of_interest(combine)
+    # interesting_region = region_of_interest(combine)
+    interesting_region = combine
 
     # Perspective transform
     M, Minv = perspective_transform_matrix()
     binary_warped = perspective_transform(interesting_region, M)
+
+    if display:
+        f, ax = plt.subplots(3, 4, figsize=(16,8))
+        ax[0, 0].set_title('image')
+        ax[0, 0].imshow(image)
+        ax[0, 1].set_title('undistorted')
+        ax[0, 1].imshow(undistorted)
+        ax[0, 2].set_title('hls_threshold')
+        ax[0, 2].imshow(hls_binary, cmap='gray')
+        ax[0, 3].set_title('grayscale_threshold')
+        ax[0, 3].imshow(grayscale_binary, cmap='gray')
+        ax[1, 0].set_title('gradientx')
+        ax[1, 0].imshow(gradientx, cmap='gray')
+        ax[1, 1].set_title('gradienty')
+        ax[1, 1].imshow(gradienty, cmap='gray')
+        ax[1, 2].set_title('gradient_magnitude')
+        ax[1, 2].imshow(gradient_magnitude, cmap='gray')
+        ax[1, 3].set_title('gradient_direction')
+        ax[1, 3].imshow(gradient_direction, cmap='gray')
+        ax[2, 0].set_title('combine')
+        ax[2, 0].imshow(combine, cmap='gray')
+        ax[2, 1].set_title('interesting_region')
+        ax[2, 1].imshow(interesting_region, cmap='gray')
+        ax[2, 2].set_title('binary_warped')
+        ax[2, 2].imshow(binary_warped, cmap='gray')
+
     return binary_warped, undistorted, Minv
 
 
 def sanity_check(binary_warped, left_fit, right_fit, left_curvature, right_curvature):
-    return True
-    # h, w = binary_warped.shape[:2]
-    # distance_threshold = 600
+    h, w = binary_warped.shape[:2]
+    distance_threshold_min = 730 * 0.75
+    distance_threshold_max = 730 * 1.25
 
-    # y_low, y_mid, y_high = int(h*0.1), int(h*0.5), int(h*0.9)
+    y_low, y_mid, y_high = int(h*0.1), int(h*0.5), int(h*0.9)
 
-    # x_left_low = left_fit[0]*y_low**2 + left_fit[1]*y_low + left_fit[2]
-    # x_left_mid = left_fit[0]*y_mid**2 + left_fit[1]*y_mid + left_fit[2]
-    # x_left_high = left_fit[0]*y_high**2 + left_fit[1]*y_high + left_fit[2]
+    x_left_low = left_fit[0]*y_low**2 + left_fit[1]*y_low + left_fit[2]
+    x_left_mid = left_fit[0]*y_mid**2 + left_fit[1]*y_mid + left_fit[2]
+    x_left_high = left_fit[0]*y_high**2 + left_fit[1]*y_high + left_fit[2]
 
-    # x_right_low = right_fit[0]*y_low**2 + right_fit[1]*y_low + right_fit[2]
-    # x_right_mid = right_fit[0]*y_mid**2 + right_fit[1]*y_mid + right_fit[2]
-    # x_right_high = right_fit[0]*y_high**2 + right_fit[1]*y_high + right_fit[2]
+    x_right_low = right_fit[0]*y_low**2 + right_fit[1]*y_low + right_fit[2]
+    x_right_mid = right_fit[0]*y_mid**2 + right_fit[1]*y_mid + right_fit[2]
+    x_right_high = right_fit[0]*y_high**2 + right_fit[1]*y_high + right_fit[2]
 
-    # distance_low = x_right_low - x_left_low
-    # distance_mid = x_right_mid - x_left_mid
-    # distance_high = x_right_high - x_left_high
+    distance_low = x_right_low - x_left_low
+    distance_mid = x_right_mid - x_left_mid
+    distance_high = x_right_high - x_left_high
 
-    # return distance_low > distance_threshold * 0.8 and \
-    #        distance_low < distance_threshold * 1.2 and \
-    #        distance_mid > distance_threshold * 0.8 and \
-    #        distance_mid < distance_threshold * 1.2 and \
-    #        distance_high > distance_threshold * 0.8 and \
-    #        distance_high < distance_threshold * 1.2
+    valid = distance_low > distance_threshold_min and \
+            distance_low < distance_threshold_max and \
+            distance_mid > distance_threshold_min and \
+            distance_mid < distance_threshold_max and \
+            distance_high > distance_threshold_min and \
+            distance_high < distance_threshold_max
+    
+    if not valid:
+        print(distance_low, distance_mid, distance_high)
+        print('sanity check failed')
+
+    return valid
 
 
 def find_lane_lines(binary_warped):
@@ -361,17 +407,17 @@ def find_lane_lines(binary_warped):
     if previous_left_fit is None or previous_right_fit is None:
         left_fit, right_fit, left_curvature, right_curvature = find_lane_lines_from_scratch(binary_warped)
     else:
-        left_fit, right_fit, left_curvature, right_curvature = find_lane_lines_using_previous_frame(binary_warped, previous_left_fit, previous_right_fit)
-
-    # print('left=%f\t\tright=%f' % (left_curvature, right_curvature))
+        # left_fit, right_fit, left_curvature, right_curvature = find_lane_lines_using_previous_frame(binary_warped, previous_left_fit, previous_right_fit)
+        left_fit, right_fit, left_curvature, right_curvature = find_lane_lines_from_scratch(binary_warped)
 
     if sanity_check(binary_warped, left_fit, right_fit, left_curvature, right_curvature):
         left_line.set_current_fit(left_fit)
         right_line.set_current_fit(right_fit)
+        return True
     else:
-        print('left=%f\t\tright=%f' % (left_curvature, right_curvature))
         left_line.skip()
         right_line.skip()
+        return False
 
 
 def project_lane_lines(image, undistorted, binary_warped, Minv):
@@ -381,6 +427,7 @@ def project_lane_lines(image, undistorted, binary_warped, Minv):
     right_fit = right_line.get_smooth_fit()
     
     if left_fit is None or right_fit is None:
+        print('projection failed')
         return undistorted
 
     left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
@@ -408,7 +455,13 @@ def project_lane_lines(image, undistorted, binary_warped, Minv):
 def process(image):
     camera_matrix, distortion_coefficients = load_camera_calibration()
     binary_warped, undistorted, Minv = pipeline(image, camera_matrix, distortion_coefficients)
-    find_lane_lines(binary_warped)
+    found = find_lane_lines(binary_warped)
+    
+    if not found:
+        plt.imsave('test_images/shadow.jpg', image)
+        pipeline(image, camera_matrix, distortion_coefficients, display=True)
+        find_lane_lines_from_scratch(binary_warped, display=True)
+
     annotated = project_lane_lines(image, undistorted, binary_warped, Minv)
     return annotated
 
@@ -419,6 +472,41 @@ if __name__ == '__main__':
         calibrate_camera()
 
     output_path  = 'test_videos_output/project_video.mp4'
-    input_clip = VideoFileClip("project_video.mp4").subclip(20, 25)
+    input_clip = VideoFileClip("project_video.mp4")
     output_clip = input_clip.fl_image(process)
     output_clip.write_videofile(output_path, audio=False)
+
+    # clip = VideoFileClip("project_video.mp4")
+    # clip.save_frame('test_images/test38.jpg', 38)
+    # clip.save_frame('test_images/test39.jpg', 39)
+    # clip.save_frame('test_images/test40.jpg', 40)
+    # clip.save_frame('test_images/test41.jpg', 41)
+    # clip.save_frame('test_images/test42.jpg', 42)
+    # clip.save_frame('test_images/test43.jpg', 43)
+    # clip.save_frame('test_images/test44.jpg', 44)
+    # clip.save_frame('test_images/test45.jpg', 45)
+    # clip.save_frame('test_images/test46.jpg', 46)
+    # clip.save_frame('test_images/test47.jpg', 47)
+    # clip.save_frame('test_images/test48.jpg', 48)
+    # clip.save_frame('test_images/test412.jpg', 41.2)
+    # clip.save_frame('test_images/test413.jpg', 41.3)
+    # clip.save_frame('test_images/test414.jpg', 41.4)
+    # clip.save_frame('test_images/test415.jpg', 41.5)
+    # clip.save_frame('test_images/test416.jpg', 41.6)
+    # clip.save_frame('test_images/test417.jpg', 41.7)
+    # clip.save_frame('test_images/test418.jpg', 41.8)
+
+    # rgba = mpimg.imread('test_images/shadow.jpg')
+    # image = cv2.cvtColor(rgba, cv2.COLOR_RGBA2RGB)
+    # camera_matrix, distortion_coefficients = load_camera_calibration()
+    # # undistorted = undistort_image(image, camera_matrix, distortion_coefficients)
+    # # plt.figure()
+    # # plt.imshow(undistorted)
+
+    # binary_warped, undistorted, Minv = pipeline(image, camera_matrix, distortion_coefficients, display=True)
+    # find_lane_lines_from_scratch(binary_warped, display=True)
+    # annotated = process(image)
+    # plt.figure()
+    # plt.imshow(annotated)
+    
+    # plt.show()
