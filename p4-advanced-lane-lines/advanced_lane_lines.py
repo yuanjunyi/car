@@ -19,6 +19,7 @@ class Line():
         self.previous_fit = None
         self.recent_fits = []
         self.recent_fits_m = []
+        self.number_of_averaged_frames = 10
 
     def prepare_for_next_frame(self):
         self.previous_fit = self.current_fit
@@ -27,12 +28,12 @@ class Line():
     def set_current_fit(self, fit):
         self.current_fit = fit
         self.recent_fits.append(self.current_fit)
-        if len(self.recent_fits) > 10:
+        if len(self.recent_fits) > self.number_of_averaged_frames:
             self.recent_fits.pop(0)
 
     def add_current_fit_m(self, fit_m):
         self.recent_fits_m.append(fit_m)
-        if len(self.recent_fits_m) > 10:
+        if len(self.recent_fits_m) > self.number_of_averaged_frames:
             self.recent_fits_m.pop(0)
 
     def get_previous_fit(self):
@@ -510,10 +511,10 @@ if __name__ == '__main__':
     if len(sys.argv) == 2 and sys.argv[1] == 'cal':
         calibrate_camera()
 
-    # output_path  = 'test_videos_output/project_video.mp4'
-    # input_clip = VideoFileClip("project_video.mp4")
-    # output_clip = input_clip.fl_image(process)
-    # output_clip.write_videofile(output_path, audio=False)
+    output_path  = 'test_videos_output/project_video.mp4'
+    input_clip = VideoFileClip("project_video.mp4")
+    output_clip = input_clip.fl_image(process)
+    output_clip.write_videofile(output_path, audio=False)
 
     # clip = VideoFileClip("project_video.mp4")
     # clip.save_frame('test_images/test222.jpg', 22.2)
@@ -525,16 +526,16 @@ if __name__ == '__main__':
     # image = cv2.cvtColor(rgba, cv2.COLOR_RGBA2RGB)
     
     # RGB
-    image = mpimg.imread('test_images/test224.jpg')
-    camera_matrix, distortion_coefficients = load_camera_calibration()
-    # undistorted = undistort_image(image, camera_matrix, distortion_coefficients)
-    # plt.figure()
-    # plt.imshow(undistorted)
+    # image = mpimg.imread('test_images/test224.jpg')
+    # camera_matrix, distortion_coefficients = load_camera_calibration()
+    # # undistorted = undistort_image(image, camera_matrix, distortion_coefficients)
+    # # plt.figure()
+    # # plt.imshow(undistorted)
 
-    binary_warped, undistorted, Minv = pipeline(image, camera_matrix, distortion_coefficients, display=True)
-    find_lines_from_scratch(binary_warped, display=True)
-    annotated = process(image)
-    plt.figure()
-    plt.imshow(annotated)
+    # binary_warped, undistorted, Minv = pipeline(image, camera_matrix, distortion_coefficients, display=True)
+    # find_lines_from_scratch(binary_warped, display=True)
+    # annotated = process(image)
+    # plt.figure()
+    # plt.imshow(annotated)
     
-    plt.show()
+    # plt.show()
