@@ -55,13 +55,13 @@ To demonstrate this step, I will describe how I apply the distortion correction 
 
 #### 2. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
 
-I used a combination of color and gradient thresholds to generate a binary image (thresholding steps at lines # through # in `advanced_lane_lines.py`).  Here's an example of my output for this step.
+I used a combination of color and gradient thresholds to generate a binary image (thresholding steps at lines #318 through #382 in `advanced_lane_lines.py`).  Here's an example of my output for this step.
 
 ![alt text][image3]
 
 #### 3. Describe how (and identify where in your code) you performed a perspective transform and provide an example of a transformed image.
 
-The code for my perspective transform includes a function called `perspective_transform()`, which appears in lines # through # in `advanced_lane_lines.py`. The `perspective_transform()` function takes as inputs an image (`image`), as well as the transform matrix (`M`). I chose to hardcode the source and destination points in the following manner:
+The code for my perspective transform includes a function called `perspective_transform()`, which appears in lines #154 through #177 in `advanced_lane_lines.py`. The `perspective_transform()` function takes as inputs an image (`image`), as well as the transform matrix (`M`). I chose to hardcode the source and destination points in the following manner:
 
 ```python
 # 4 source coordinates
@@ -90,11 +90,11 @@ Then I located the lane lines in the warped image by using the sliding window me
 
 #### 5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
 
-I did this in lines # through # in my code in `advanced_lane_lines.py`
+I did this in lines #49 through #56 in my code in `advanced_lane_lines.py`
 
 #### 6. Provide an example image of your result plotted back down onto the road such that the lane area is identified clearly.
 
-I implemented this step in lines # through # in my code in `advanced_lane_lines.py` in the function `project_lines()`.  Here is an example of my result on a test image:
+I implemented this step in lines #439 through #467 in my code in `advanced_lane_lines.py` in the function `project_lines()`.  Here is an example of my result on a test image:
 
 ![alt text][image6]
 
