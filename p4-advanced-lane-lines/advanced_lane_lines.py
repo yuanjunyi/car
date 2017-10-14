@@ -30,8 +30,8 @@ class Line():
         if len(self.recent_fits) > 10:
             self.recent_fits.pop(0)
 
-    def add_current_fit_meter(self, fit_meter):
-        self.recent_fits_m.append(fit_meter)
+    def add_current_fit_m(self, fit_m):
+        self.recent_fits_m.append(fit_m)
         if len(self.recent_fits_m) > 10:
             self.recent_fits_m.pop(0)
 
@@ -53,9 +53,6 @@ class Line():
         else:
             print('recent_fits_m is empty')
             return None
-
-    def skip(self):
-        print('skip this frame')
 
 
 left_line = Line()
@@ -179,7 +176,7 @@ def perspective_transform_matrix():
     return M, Minv
 
 
-def find_lane_lines_using_previous_frame(binary_warped, previous_left_fit, previous_right_fit):
+def find_lines_using_previous_frame(binary_warped, previous_left_fit, previous_right_fit):
     margin = 100
     nonzero = binary_warped.nonzero()
     nonzeroy = np.array(nonzero[0])
@@ -187,33 +184,33 @@ def find_lane_lines_using_previous_frame(binary_warped, previous_left_fit, previ
     previous_left_x = previous_left_fit[0]*nonzeroy**2 + \
                       previous_left_fit[1]*nonzeroy + \
                       previous_left_fit[2]
-    left_lane_inds = ((nonzerox > previous_left_x - margin) &
-                      (nonzerox < previous_left_x + margin))
+    left_inds = ((nonzerox > previous_left_x - margin) &
+                 (nonzerox < previous_left_x + margin))
 
     previous_right_x = previous_right_fit[0]*nonzeroy**2 + \
                        previous_right_fit[1]*nonzeroy + \
                        previous_right_fit[2]
-    right_lane_inds = ((nonzerox > previous_right_x - margin) &
-                      (nonzerox < previous_right_x + margin))
+    right_inds = ((nonzerox > previous_right_x - margin) &
+                  (nonzerox < previous_right_x + margin))
     
     # Extract left and right line pixel positions
-    leftx = nonzerox[left_lane_inds]
-    lefty = nonzeroy[left_lane_inds] 
-    rightx = nonzerox[right_lane_inds]
-    righty = nonzeroy[right_lane_inds]
+    leftx = nonzerox[left_inds]
+    lefty = nonzeroy[left_inds] 
+    rightx = nonzerox[right_inds]
+    righty = nonzeroy[right_inds]
 
-    # Fit a second order polynomial in image space
+    # Fit a second order polynomial in image space: pixel
     left_fit = fit_polynomial(lefty, leftx)
     right_fit = fit_polynomial(righty, rightx)
 
-    # Fit a second order polynomial in world space
+    # Fit a second order polynomial in real world: meter
     left_fit_m = fit_polynomial(lefty, leftx, P['m_per_pixel_y'], P['m_per_pixel_x'])
     right_fit_m = fit_polynomial(righty, rightx, P['m_per_pixel_y'], P['m_per_pixel_x'])
 
     return left_fit, right_fit, left_fit_m, right_fit_m
 
 
-def find_lane_lines_from_scratch(binary_warped, display=False):
+def find_lines_from_scratch(binary_warped, display=False):
     # Take a histogram of the bottom half of the image
     h, w = binary_warped.shape[:2]
     histogram = np.sum(binary_warped[int(h/2):,:], axis=0)
@@ -243,11 +240,11 @@ def find_lane_lines_from_scratch(binary_warped, display=False):
     rightx_current = rightx_base
 
     # Create empty lists to receive left and right lane pixel indices
-    left_lane_inds = []
-    right_lane_inds = []
+    left_inds = []
+    right_inds = []
 
     if display:
-        # Create an output image to draw on and  visualize the result       
+        # Create an output image to draw on and visualize the result       
         out_img = np.dstack((binary_warped, binary_warped, binary_warped))
 
     for window in range(nwindows):
@@ -275,8 +272,8 @@ def find_lane_lines_from_scratch(binary_warped, display=False):
              (nonzerox >= win_xright_low) & (nonzerox < win_xright_high)).nonzero()[0]
 
         # Append these indices to the lists
-        left_lane_inds.append(good_left_inds)
-        right_lane_inds.append(good_right_inds)
+        left_inds.append(good_left_inds)
+        right_inds.append(good_right_inds)
 
         # If you found > minpix pixels, recenter next window on their mean position
         if len(good_left_inds) > minpix:
@@ -285,14 +282,14 @@ def find_lane_lines_from_scratch(binary_warped, display=False):
             rightx_current = np.int(np.mean(nonzerox[good_right_inds]))
 
     # Concatenate the arrays of indices
-    left_lane_inds = np.concatenate(left_lane_inds)
-    right_lane_inds = np.concatenate(right_lane_inds)
+    left_inds = np.concatenate(left_inds)
+    right_inds = np.concatenate(right_inds)
 
     # Extract left and right line pixel positions
-    leftx = nonzerox[left_lane_inds]
-    lefty = nonzeroy[left_lane_inds]
-    rightx = nonzerox[right_lane_inds]
-    righty = nonzeroy[right_lane_inds]
+    leftx = nonzerox[left_inds]
+    lefty = nonzeroy[left_inds]
+    rightx = nonzerox[right_inds]
+    righty = nonzeroy[right_inds]
 
     # Fit a second order polynomial in image space
     left_fit = fit_polynomial(lefty, leftx)
@@ -304,8 +301,8 @@ def find_lane_lines_from_scratch(binary_warped, display=False):
 
     if display:
         # Draw output image     
-        out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [1, 0, 0]     
-        out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 1]
+        out_img[nonzeroy[left_inds], nonzerox[left_inds]] = [1, 0, 0]     
+        out_img[nonzeroy[right_inds], nonzerox[right_inds]] = [0, 0, 1]
         plt.figure()
         plt.imshow(out_img)
 
@@ -367,9 +364,9 @@ def pipeline(image, camera_matrix, distortion_coefficients, display=False):
         ax[2, 0].imshow(combine, cmap='gray')
         ax[2, 1].set_title('binary_warped')
         ax[2, 1].imshow(binary_warped, cmap='gray')
-        ax[2, 2].set_title('gradientxy')
+        ax[2, 2].set_title('gradx & grady')
         ax[2, 2].imshow(gradientxy, cmap='gray')
-        ax[2, 3].set_title('gradientmd')
+        ax[2, 3].set_title('gradmag & graddir')
         ax[2, 3].imshow(gradientmd, cmap='gray')
 
     return binary_warped, undistorted, Minv
@@ -408,29 +405,28 @@ def sanity_check(binary_warped, left_fit, right_fit):
     return valid
 
 
-def find_lane_lines(binary_warped):
+def find_lines(binary_warped):
     left_line.prepare_for_next_frame()
     right_line.prepare_for_next_frame()
     previous_left_fit = left_line.get_previous_fit()
     previous_right_fit = right_line.get_previous_fit()
     if previous_left_fit is None or previous_right_fit is None:
-        left_fit, right_fit, left_fit_m, right_fit_m = find_lane_lines_from_scratch(binary_warped)
+        left_fit, right_fit, left_fit_m, right_fit_m = find_lines_from_scratch(binary_warped)
     else:
-        left_fit, right_fit, left_fit_m, right_fit_m = find_lane_lines_using_previous_frame(binary_warped, previous_left_fit, previous_right_fit)
+        left_fit, right_fit, left_fit_m, right_fit_m = find_lines_using_previous_frame(binary_warped, previous_left_fit, previous_right_fit)
 
     if sanity_check(binary_warped, left_fit, right_fit):
         left_line.set_current_fit(left_fit)
         right_line.set_current_fit(right_fit)
-        left_line.add_current_fit_meter(left_fit_m)
-        right_line.add_current_fit_meter(right_fit_m)
+        left_line.add_current_fit_m(left_fit_m)
+        right_line.add_current_fit_m(right_fit_m)
         return True
     else:
-        left_line.skip()
-        right_line.skip()
+        print('skip this frame')
         return False
 
 
-def project_lane_lines(undistorted, binary_warped, Minv):
+def project_lines(undistorted, binary_warped, Minv):
     left_fit = left_line.get_smooth_fit()
     right_fit = right_line.get_smooth_fit()
     if left_fit is None or right_fit is None:
@@ -455,9 +451,9 @@ def project_lane_lines(undistorted, binary_warped, Minv):
     cv2.fillPoly(color_warped, np.int_([pts]), (0,255,0))
 
     # Warp the blank back to original image space using inverse perspective matrix (Minv)
-    lane_lines = cv2.warpPerspective(color_warped, Minv, (w,h))
+    lines = cv2.warpPerspective(color_warped, Minv, (w,h))
     # Combine the result with the original undistorred image
-    result = cv2.addWeighted(undistorted, 1, lane_lines, 0.3, 0)
+    result = cv2.addWeighted(undistorted, 1, lines, 0.3, 0)
     return result
 
 
@@ -502,14 +498,8 @@ def display_position(image):
 def process(image):
     camera_matrix, distortion_coefficients = load_camera_calibration()
     binary_warped, undistorted, Minv = pipeline(image, camera_matrix, distortion_coefficients)
-    found = find_lane_lines(binary_warped)
-    
-    # if not found:
-    #     plt.imsave('difficult_images/difficult.jpg', image)
-    #     pipeline(image, camera_matrix, distortion_coefficients, display=True)
-    #     find_lane_lines_from_scratch(binary_warped, display=True)
-
-    projected = project_lane_lines(undistorted, binary_warped, Minv)
+    found = find_lines(binary_warped)
+    projected = project_lines(undistorted, binary_warped, Minv)
     annotated = display_curvature(projected)
     annotated = display_position(annotated)
     return annotated
@@ -542,7 +532,7 @@ if __name__ == '__main__':
     # plt.imshow(undistorted)
 
     binary_warped, undistorted, Minv = pipeline(image, camera_matrix, distortion_coefficients, display=True)
-    find_lane_lines_from_scratch(binary_warped, display=True)
+    find_lines_from_scratch(binary_warped, display=True)
     annotated = process(image)
     plt.figure()
     plt.imshow(annotated)
