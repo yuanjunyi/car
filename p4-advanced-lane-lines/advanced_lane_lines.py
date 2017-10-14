@@ -167,10 +167,10 @@ def perspective_transform_matrix():
 
     # 4 desired coordinates
     dst = np.float32(
-        [[280, 0],
-         [1010, 0],
-         [1010, 720],
-         [280, 720]])
+        [[320, 0],
+         [960, 0],
+         [960, 720],
+         [320, 720]])
 
     M = cv2.getPerspectiveTransform(src, dst)
     Minv = cv2.getPerspectiveTransform(dst, src)
@@ -301,11 +301,16 @@ def find_lines_from_scratch(binary_warped, display=False):
     right_fit_m = fit_polynomial(righty, rightx, P['m_per_pixel_y'], P['m_per_pixel_x'])
 
     if display:
-        # Draw output image     
-        out_img[nonzeroy[left_inds], nonzerox[left_inds]] = [1, 0, 0]     
-        out_img[nonzeroy[right_inds], nonzerox[right_inds]] = [0, 0, 1]
-        plt.figure()
-        plt.imshow(out_img)
+        out_img[nonzeroy[left_inds], nonzerox[left_inds]] = (1,0,0)     
+        out_img[nonzeroy[right_inds], nonzerox[right_inds]] = (0,0,1)
+        ploty = np.linspace(0, h-1, h)
+        left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
+        right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
+        pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
+        pts_right = np.array([np.transpose(np.vstack([right_fitx, ploty]))])
+        cv2.polylines(out_img, np.int_([pts_left]), False, (1,1,0), 2)
+        cv2.polylines(out_img, np.int_([pts_right]), False, (1,1,0), 2)
+        mpimg.imsave('output_images/lines.jpg', out_img)
 
     return left_fit, right_fit, left_fit_m, right_fit_m
 
@@ -338,6 +343,10 @@ def pipeline(image, camera_matrix, distortion_coefficients, display=False):
     binary_warped = perspective_transform(combine, M)
 
     if display:
+        mpimg.imsave('output_images/undistorted.jpg', undistorted)
+        mpimg.imsave('output_images/combine.jpg', combine, cmap='gray')
+        mpimg.imsave('output_images/binary_warped.jpg', binary_warped, cmap='gray')
+
         gradientxy = np.zeros_like(gray, np.float)
         gradientxy[(gradientx == 1) & (gradienty == 1)] = 1
 
@@ -361,22 +370,22 @@ def pipeline(image, camera_matrix, distortion_coefficients, display=False):
         ax[1, 2].imshow(gradient_magnitude, cmap='gray')
         ax[1, 3].set_title('gradient_direction')
         ax[1, 3].imshow(gradient_direction, cmap='gray')
-        ax[2, 0].set_title('combine')
-        ax[2, 0].imshow(combine, cmap='gray')
-        ax[2, 1].set_title('binary_warped')
-        ax[2, 1].imshow(binary_warped, cmap='gray')
-        ax[2, 2].set_title('gradx & grady')
-        ax[2, 2].imshow(gradientxy, cmap='gray')
-        ax[2, 3].set_title('gradmag & graddir')
-        ax[2, 3].imshow(gradientmd, cmap='gray')
+        ax[2, 0].set_title('gradx & grady')
+        ax[2, 0].imshow(gradientxy, cmap='gray')
+        ax[2, 1].set_title('gradmag & graddir')
+        ax[2, 1].imshow(gradientmd, cmap='gray')
+        ax[2, 2].set_title('combine')
+        ax[2, 2].imshow(combine, cmap='gray')
+        ax[2, 3].set_title('binary_warped')
+        ax[2, 3].imshow(binary_warped, cmap='gray')
 
     return binary_warped, undistorted, Minv
 
 
 def sanity_check(binary_warped, left_fit, right_fit):
     h, w = binary_warped.shape[:2]
-    distance_threshold_min = 730 * 0.5
-    distance_threshold_max = 730 * 1.5
+    distance_threshold_min = 640 * 0.5
+    distance_threshold_max = 640 * 1.5
 
     y_low, y_mid, y_high = int(h*0.1), int(h*0.5), int(h*0.9)
 
@@ -511,10 +520,10 @@ if __name__ == '__main__':
     if len(sys.argv) == 2 and sys.argv[1] == 'cal':
         calibrate_camera()
 
-    output_path  = 'test_videos_output/project_video.mp4'
-    input_clip = VideoFileClip("project_video.mp4")
-    output_clip = input_clip.fl_image(process)
-    output_clip.write_videofile(output_path, audio=False)
+    # output_path  = 'test_videos_output/project_video.mp4'
+    # input_clip = VideoFileClip("project_video.mp4")
+    # output_clip = input_clip.fl_image(process)
+    # output_clip.write_videofile(output_path, audio=False)
 
     # clip = VideoFileClip("project_video.mp4")
     # clip.save_frame('test_images/test222.jpg', 22.2)
@@ -526,16 +535,16 @@ if __name__ == '__main__':
     # image = cv2.cvtColor(rgba, cv2.COLOR_RGBA2RGB)
     
     # RGB
-    # image = mpimg.imread('test_images/test224.jpg')
-    # camera_matrix, distortion_coefficients = load_camera_calibration()
-    # # undistorted = undistort_image(image, camera_matrix, distortion_coefficients)
-    # # plt.figure()
-    # # plt.imshow(undistorted)
+    camera_matrix, distortion_coefficients = load_camera_calibration()
+    calibration = mpimg.imread('camera_cal/calibration1.jpg')
+    calibrated = undistort_image(calibration, camera_matrix, distortion_coefficients)
+    mpimg.imsave('output_images/calibrated.jpg', calibrated)
 
-    # binary_warped, undistorted, Minv = pipeline(image, camera_matrix, distortion_coefficients, display=True)
-    # find_lines_from_scratch(binary_warped, display=True)
-    # annotated = process(image)
-    # plt.figure()
-    # plt.imshow(annotated)
-    
-    # plt.show()
+    image = mpimg.imread('test_images/test416.jpg')
+    binary_warped, undistorted, Minv = pipeline(image, camera_matrix, distortion_coefficients, display=True)
+    left_fit, right_fit, a, b = find_lines_from_scratch(binary_warped, display=True)
+    left_line.set_current_fit(left_fit)
+    right_line.set_current_fit(right_fit)
+    projected = project_lines(undistorted, binary_warped, Minv)
+    mpimg.imsave('output_images/projected.jpg', projected)
+    plt.show()
