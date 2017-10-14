@@ -540,6 +540,11 @@ if __name__ == '__main__':
     calibrated = undistort_image(calibration, camera_matrix, distortion_coefficients)
     mpimg.imsave('output_images/calibrated.jpg', calibrated)
 
+    straight_line = mpimg.imread('test_images/straight_lines2.jpg')
+    M, Minv = perspective_transform_matrix()
+    warped_straight_line = perspective_transform(straight_line, M)
+    mpimg.imsave('output_images/warped_straight_line.jpg', warped_straight_line)
+
     image = mpimg.imread('test_images/test416.jpg')
     binary_warped, undistorted, Minv = pipeline(image, camera_matrix, distortion_coefficients, display=True)
     left_fit, right_fit, a, b = find_lines_from_scratch(binary_warped, display=True)
@@ -547,4 +552,5 @@ if __name__ == '__main__':
     right_line.set_current_fit(right_fit)
     projected = project_lines(undistorted, binary_warped, Minv)
     mpimg.imsave('output_images/projected.jpg', projected)
+
     plt.show()
