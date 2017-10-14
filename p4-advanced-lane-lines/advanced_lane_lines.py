@@ -430,22 +430,21 @@ def find_lane_lines(binary_warped):
         return False
 
 
-def project_lane_lines(image, undistorted, binary_warped, Minv):
-    h, w = binary_warped.shape[:2]
-    ploty = np.linspace(0, h-1, h)
+def project_lane_lines(undistorted, binary_warped, Minv):
     left_fit = left_line.get_smooth_fit()
     right_fit = right_line.get_smooth_fit()
-    
     if left_fit is None or right_fit is None:
         print('projection failed')
         return undistorted
 
+    h, w = binary_warped.shape[:2]
+    ploty = np.linspace(0, h-1, h)
     left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
     right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
 
     # Create an image to draw the lines on
-    warp_zero = np.zeros_like(binary_warped).astype(np.uint8)
-    color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
+    zero_warped = np.zeros_like(binary_warped).astype(np.uint8)
+    color_warped = np.dstack((zero_warped, zero_warped, zero_warped))
 
     # Recast the x and y points into usable format for cv2.fillPoly()
     pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
@@ -453,24 +452,52 @@ def project_lane_lines(image, undistorted, binary_warped, Minv):
     pts = np.hstack((pts_left, pts_right))
 
     # Draw the lane onto the warped blank image
-    cv2.fillPoly(color_warp, np.int_([pts]), (0,255,0))
+    cv2.fillPoly(color_warped, np.int_([pts]), (0,255,0))
 
     # Warp the blank back to original image space using inverse perspective matrix (Minv)
-    newwarp = cv2.warpPerspective(color_warp, Minv, (image.shape[1], image.shape[0]))
-    # Combine the result with the original image
-    result = cv2.addWeighted(undistorted, 1, newwarp, 0.3, 0)
+    lane_lines = cv2.warpPerspective(color_warped, Minv, (w,h))
+    # Combine the result with the original undistorred image
+    result = cv2.addWeighted(undistorted, 1, lane_lines, 0.3, 0)
     return result
 
 
 def display_curvature(image):
     h, w = image.shape[:2]
     y = h - 1
-    left_text = 'Left: radius of curvature = %dm' % left_line.get_curvature(y)
-    right_text = 'Right: radius of curvature = %dm' % right_line.get_curvature(y)
+    left_curvature = left_line.get_curvature(y)
+    right_curvature = right_line.get_curvature(y)
+    if left_curvature is None or right_curvature is None:
+        return image
+
+    left_text = 'Left: radius of curvature = %dm' % left_curvature
+    right_text = 'Right: radius of curvature = %dm' % right_curvature
     white = (255, 255, 255)
     cv2.putText(image, left_text, (50,50), cv2.FONT_HERSHEY_SIMPLEX, 1, white, 1, cv2.LINE_AA)
     cv2.putText(image, right_text, (50,100), cv2.FONT_HERSHEY_SIMPLEX, 1, white, 1, cv2.LINE_AA)
     return image
+
+
+def display_position(image):
+    left_fit = left_line.get_smooth_fit()
+    right_fit = right_line.get_smooth_fit()
+    if left_fit is None or right_fit is None:
+        return image
+
+    h, w = image.shape[:2]
+    y = h - 1
+
+    leftx = left_fit[0]*y**2 + left_fit[1]*y + left_fit[2]
+    rightx = right_fit[0]*y**2 + right_fit[1]*y + right_fit[2]
+    lane_center = (leftx + rightx) / 2
+    offset = np.absolute(lane_center-w/2) * P['m_per_pixel_x']
+    if lane_center < w/2:
+        text = 'Vehicle is %.2fm left of center' % offset
+    else:
+        text = 'Vehicle is %.2fm right of center' % offset
+    white = (255, 255, 255)
+    cv2.putText(image, text, (50,150), cv2.FONT_HERSHEY_SIMPLEX, 1, white, 1, cv2.LINE_AA)
+    return image
+
 
 def process(image):
     camera_matrix, distortion_coefficients = load_camera_calibration()
@@ -482,8 +509,9 @@ def process(image):
     #     pipeline(image, camera_matrix, distortion_coefficients, display=True)
     #     find_lane_lines_from_scratch(binary_warped, display=True)
 
-    projected = project_lane_lines(image, undistorted, binary_warped, Minv)
+    projected = project_lane_lines(undistorted, binary_warped, Minv)
     annotated = display_curvature(projected)
+    annotated = display_position(annotated)
     return annotated
 
 
@@ -492,10 +520,10 @@ if __name__ == '__main__':
     if len(sys.argv) == 2 and sys.argv[1] == 'cal':
         calibrate_camera()
 
-    output_path  = 'test_videos_output/project_video.mp4'
-    input_clip = VideoFileClip("project_video.mp4")
-    output_clip = input_clip.fl_image(process).subclip(20, 41)
-    output_clip.write_videofile(output_path, audio=False)
+    # output_path  = 'test_videos_output/project_video.mp4'
+    # input_clip = VideoFileClip("project_video.mp4")
+    # output_clip = input_clip.fl_image(process)
+    # output_clip.write_videofile(output_path, audio=False)
 
     # clip = VideoFileClip("project_video.mp4")
     # clip.save_frame('test_images/test222.jpg', 22.2)
@@ -506,17 +534,17 @@ if __name__ == '__main__':
     # rgba = mpimg.imread('test_images/shadow.jpg')
     # image = cv2.cvtColor(rgba, cv2.COLOR_RGBA2RGB)
     
-    # # RGB
-    # image = mpimg.imread('test_images/test224.jpg')
-    # camera_matrix, distortion_coefficients = load_camera_calibration()
-    # # undistorted = undistort_image(image, camera_matrix, distortion_coefficients)
-    # # plt.figure()
-    # # plt.imshow(undistorted)
-
-    # binary_warped, undistorted, Minv = pipeline(image, camera_matrix, distortion_coefficients, display=True)
-    # find_lane_lines_from_scratch(binary_warped, display=True)
-    # annotated = process(image)
+    # RGB
+    image = mpimg.imread('test_images/test224.jpg')
+    camera_matrix, distortion_coefficients = load_camera_calibration()
+    # undistorted = undistort_image(image, camera_matrix, distortion_coefficients)
     # plt.figure()
-    # plt.imshow(annotated)
+    # plt.imshow(undistorted)
+
+    binary_warped, undistorted, Minv = pipeline(image, camera_matrix, distortion_coefficients, display=True)
+    find_lane_lines_from_scratch(binary_warped, display=True)
+    annotated = process(image)
+    plt.figure()
+    plt.imshow(annotated)
     
-    # plt.show()
+    plt.show()
