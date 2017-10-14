@@ -19,6 +19,7 @@ The goals / steps of this project are the following:
 [image4]: ./output_images/warped_straight_line.jpg "Warp Example"
 [image5]: ./output_images/lines.jpg "Fit Visual"
 [image6]: ./output_images/projected.jpg "Output"
+[image7]: ./output_images/pipeline.png "Pipeline"
 [video1]: ./test_videos_output/project_video.mp4 "Video"
 
 ## [Rubric](https://review.udacity.com/#!/rubrics/571/view) Points
@@ -111,4 +112,12 @@ Here's a [link to my video result](./test_videos_output/project_video.mp4)
 
 #### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
+The main problem I faced in the project is to create a good quality thresholded binary image. As long as this step is successful, my pipeline can work.
+
+When I tested my pipeline on project_video.mp4, I saved the problematic frames and then fine tuned the pipeline. Here is an example:
+
+![alt text][image7]
+
+In this example, there are black shadows on the road and the HLS threshold can not filter them. For this reason, I added the grayscale threshold. I also fine tuned the threshlds of gradient magnitude and gradient direction using the same approach and removed the small noise.
+
+
