@@ -10,6 +10,7 @@ from sklearn.externals import joblib
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from skimage.feature import hog
+from scipy.ndimage.measurements import label
 
 
 def get_hog_features(gray,
@@ -97,12 +98,10 @@ def load_model():
     return X_scaler, svc
 
 
-def find_cars(image, scale, X_scaler, svc):
+def find_cars(image, scale, ystart, ystop, X_scaler, svc):
     assert(image.dtype == np.float32)
     draw_image = np.copy(image)
 
-    ystart = 400
-    ystop = 650
     image = cv2.cvtColor(image, cv2.COLOR_RGB2YCrCb)
     image = image[ystart:ystop, :, :]
     h, w = image.shape[:2]
@@ -118,12 +117,13 @@ def find_cars(image, scale, X_scaler, svc):
 
     # xnumber_of_blocks = w // pixels_per_cell - cells_per_block + 1
     # ynumber_of_blocks = h // pixels_per_cell - cells_per_block + 1
-    xsteps = (w // pixels_per_cell - window // pixels_per_cell) // cell_per_step + 1
-    ysteps = (h // pixels_per_cell - window // pixels_per_cell) // cell_per_step + 1
+    xsteps = (w // pixels_per_cell - window // pixels_per_cell) // cell_per_step
+    ysteps = (h // pixels_per_cell - window // pixels_per_cell) // cell_per_step
 
     channels = [image[:,:,0], image[:,:,1], image[:,:,2]]
     hogs = [get_hog_features(c, 9, pixels_per_cell, cells_per_block, visualise=False, feature_vector=False) for c in channels]
 
+    bbox_list = []
     for xstep in range(xsteps):
         for ystep in range(ysteps):
             xcell = xstep * cell_per_step
@@ -145,12 +145,38 @@ def find_cars(image, scale, X_scaler, svc):
                 unscaled_xleft = np.int(xleft*scale)
                 unscaled_ytop = np.int(ytop*scale)
                 unscaled_window = np.int(window*scale)
-                cv2.rectangle(draw_image,
-                              (unscaled_xleft, unscaled_ytop+ystart),
-                              (unscaled_xleft+unscaled_window, unscaled_ytop+ystart+unscaled_window),
-                              (0,0,1),
-                              3)
+                bbox_list.append(((unscaled_xleft, unscaled_ytop+ystart),
+                                  (unscaled_xleft+unscaled_window, unscaled_ytop+ystart+unscaled_window)))
+    return bbox_list
+
+
+def draw_bbox(image, bbox_list):
+    assert(image.dtype == np.float32)
+    draw_image = np.copy(image)
+    for b in bbox_list:
+        cv2.rectangle(draw_image, b[0], b[1], (0,0,1), 3)
     return draw_image
+
+
+def build_heatmap(image, bbox_list, threshold):
+    heatmap = np.zeros_like(image[:,:,0], np.uint8)
+    for b in bbox_list:
+        heatmap[b[0][1]:b[1][1], b[0][0]:b[1][0]] += 1
+    heatmap[heatmap <= threshold] = 0
+    return heatmap
+
+
+def extract_bbox(heatmap):
+    labels, nlabel = label(heatmap)
+
+    bbox_list = []
+    for i in range(1, nlabel+1):
+        nonzero = (labels == i).nonzero()
+        nonzeroy = nonzero[0]
+        nonzerox = nonzero[1]
+        bbox_list.append(((np.min(nonzerox), np.min(nonzeroy)),
+                          (np.max(nonzerox), np.max(nonzeroy))))
+    return bbox_list
 
 
 if __name__ == '__main__':
@@ -162,6 +188,23 @@ if __name__ == '__main__':
     image = mpimg.imread('test_images/test1.jpg')
     assert(image.dtype == np.uint8)
     image = image.astype(np.float32) / 255
-    annoted = find_cars(image, 2, X_scaler, svc)
+    
+    S_bbox_list = find_cars(image, 0.5, 400, 550, X_scaler, svc)
+    M_bbox_list = find_cars(image, 1.5, 400, 650, X_scaler, svc)
+    L_bbox_list = find_cars(image, 2, 500, 650, X_scaler, svc)
+    bbox_list = S_bbox_list + M_bbox_list + L_bbox_list
+
+    annoted = draw_bbox(image, bbox_list)
+    plt.figure()
     plt.imshow(annoted)
+    
+    heatmap = build_heatmap(image, bbox_list, 1)
+    plt.figure()
+    plt.imshow(heatmap, cmap='hot')
+
+    bbox_list = extract_bbox(heatmap)
+    annoted = draw_bbox(image, bbox_list)
+    plt.figure()
+    plt.imshow(annoted)
+
     plt.show()
