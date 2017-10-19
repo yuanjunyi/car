@@ -2,6 +2,7 @@ import sys
 import cv2
 import glob
 import time
+import csv
 import numpy as np
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
@@ -26,6 +27,7 @@ def get_hog_features(gray,
                                   cells_per_block=(cells_per_block, cells_per_block),
                                   block_norm='L2-Hys',
                                   visualise=visualise,
+                                  transform_sqrt=True,
                                   feature_vector=feature_vector)
         return features, hog_image
     else:      
@@ -35,6 +37,7 @@ def get_hog_features(gray,
                        cells_per_block=(cells_per_block, cells_per_block),
                        block_norm='L2-Hys',
                        visualise=visualise,
+                       transform_sqrt=True,
                        feature_vector=feature_vector)
         return features
 
@@ -78,15 +81,20 @@ def train_model():
     car_images.extend(glob.glob('vehicles/GTI_MiddleClose/image*.png'))
     car_images.extend(glob.glob('vehicles/GTI_Right/image*.png'))
     car_images.extend(glob.glob('vehicles/KITTI_extracted/*.png'))
+    print(len(car_images))
 
     notcar_images = []
     notcar_images.extend(glob.glob('non-vehicles/Extras/extra*.png'))
     notcar_images.extend(glob.glob('non-vehicles/GTI/image*.png'))
+    print(len(notcar_images))
     t2 = time.time()
 
     print('extracting features...')
     car_features = [extract_features(mpimg.imread(f)) for f in car_images]
     notcar_features = [extract_features(mpimg.imread(f)) for f in notcar_images]
+    # udacity_car_features, udacity_notcar_features = udacity_dataset_features()
+    # car_features.extend(udacity_car_features)
+    # notcar_features.extend(udacity_notcar_features)
 
     X = np.vstack((car_features, notcar_features)).astype(np.float64)
     X_scaler = StandardScaler().fit(X)
@@ -201,6 +209,38 @@ def extract_bbox(heatmap):
     return bbox_list
 
 
+def extract_features_row(row):
+    image = mpimg.imread('object-detection-crowdai/'+row['Frame'])
+    ymin = min(int(row['ymin']), int(row['ymax']))
+    ymax = max(int(row['ymin']), int(row['ymax']))
+    xmin = min(int(row['xmin']), int(row['xmax']))
+    xmax = max(int(row['xmin']), int(row['xmax']))
+    if ymax<=ymin or xmax<=xmin:
+        return None
+    else:        
+        patch = cv2.resize(image[ymin:ymax, xmin:xmax], (64,64))
+        patch = patch.astype(np.float32) / 255
+        return extract_features(patch)
+
+
+def udacity_dataset_features():
+    car_features = []
+    notcar_features = []
+    with open('object-detection-crowdai/labels.csv') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            if row['Label'] == 'Car' and len(car_features) < 5000:
+                features = extract_features_row(row)
+                if features is not None:
+                    car_features.append(features)
+            if row['Label'] == 'Pedestrian' and len(notcar_features) < 5000:
+                features = extract_features_row(row)
+                if features is not None:
+                    notcar_features.append(features)
+            if len(car_features) == 5000 and len(notcar_features) == 5000:
+                return car_features, notcar_features
+
+
 if __name__ == '__main__':
     if len(sys.argv) == 2 and sys.argv[1] == 'train':
         X_scaler, svc = train_model()
@@ -211,11 +251,14 @@ if __name__ == '__main__':
     assert(image.dtype == np.uint8)
     image = image.astype(np.float32) / 255
     
-    bbox_list = find_cars(image, 1.5, 400, 650, X_scaler, svc)
+    l_bbox_list = find_cars(image, 2, 400, 650, X_scaler, svc)
+    m_bbox_list = find_cars(image, 1.5, 400, 650, X_scaler, svc)
+    s_bbox_list = find_cars(image, 1, 400, 650, X_scaler, svc)
+    bbox_list = l_bbox_list + m_bbox_list + s_bbox_list
     detection = draw_bbox(image, bbox_list)
     
     heatmap = build_heatmap(image, bbox_list)
-    heatmap_thresh = heatmap_threshold(heatmap, 1)
+    heatmap_thresh = heatmap_threshold(heatmap, 7)
 
     bbox_list = extract_bbox(heatmap_thresh)
     annoted = draw_bbox(image, bbox_list)
