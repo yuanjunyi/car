@@ -39,17 +39,36 @@ def get_hog_features(gray,
         return features
 
 
+def bin_spatial(image, size=(32, 32)):
+    features = cv2.resize(image, size).ravel()
+    return features
+
+# `image` should be np.float32 and pixel data range is [0, 1]
+def color_hist(image, nbins=32, bins_range=(0, 1)):
+    assert(image.dtype == np.float32)
+    hist_features = []
+    for channel in range(image.shape[2]):
+        hist, bin_edges = np.histogram(image[:,:,channel], bins=nbins, range=bins_range)
+        hist_features.append(hist)
+    return np.concatenate(hist_features)
+
+# `image` should be np.float32 and pixel data range is [0, 1] 
 def extract_features(image):
+    assert(image.dtype == np.float32)
     image = cv2.cvtColor(image, cv2.COLOR_RGB2YCrCb)
     hog_features = []
     for channel in range(image.shape[2]):
-        hog_features.extend(get_hog_features(image[:,:,channel],
+        hog_features.append(get_hog_features(image[:,:,channel],
                                              orientations=9,
                                              pixels_per_cell=8,
                                              cells_per_block=2,
                                              visualise=False,
                                              feature_vector=True))
-    return np.ravel(hog_features)
+    features = []
+    features.append(np.concatenate(hog_features))
+    features.append(bin_spatial(image))
+    features.append(color_hist(image))
+    return np.concatenate(features)
 
 
 def train_model():
@@ -69,7 +88,7 @@ def train_model():
     car_features = [extract_features(mpimg.imread(f)) for f in car_images]
     notcar_features = [extract_features(mpimg.imread(f)) for f in notcar_images]
 
-    X = np.vstack(car_features+notcar_features).astype(np.float64)
+    X = np.vstack((car_features, notcar_features)).astype(np.float64)
     X_scaler = StandardScaler().fit(X)
     scaled_X = X_scaler.transform(X)
     y = np.hstack((np.ones(len(car_features)), np.zeros(len(notcar_features)))) 
@@ -97,7 +116,7 @@ def load_model():
     print('model loaded')
     return X_scaler, svc
 
-
+# `image` should be np.float32 and pixel data range is [0, 1]
 def find_cars(image, scale, ystart, ystop, X_scaler, svc):
     assert(image.dtype == np.float32)
     draw_image = np.copy(image)
@@ -112,13 +131,10 @@ def find_cars(image, scale, ystart, ystop, X_scaler, svc):
     cells_per_block = 2
     window = 64
     cell_per_step = 2
-
     block_per_window = window // pixels_per_cell - cells_per_block + 1
 
-    # xnumber_of_blocks = w // pixels_per_cell - cells_per_block + 1
-    # ynumber_of_blocks = h // pixels_per_cell - cells_per_block + 1
-    xsteps = (w // pixels_per_cell - window // pixels_per_cell) // cell_per_step
-    ysteps = (h // pixels_per_cell - window // pixels_per_cell) // cell_per_step
+    xsteps = (w // pixels_per_cell - window // pixels_per_cell) // cell_per_step + 1
+    ysteps = (h // pixels_per_cell - window // pixels_per_cell) // cell_per_step + 1
 
     channels = [image[:,:,0], image[:,:,1], image[:,:,2]]
     hogs = [get_hog_features(c, 9, pixels_per_cell, cells_per_block, visualise=False, feature_vector=False) for c in channels]
@@ -134,10 +150,11 @@ def find_cars(image, scale, ystart, ystop, X_scaler, svc):
 
             xleft = xcell * pixels_per_cell
             ytop = ycell * pixels_per_cell
-            # window_image = cv2.resize(image[ytop:ytop+window, xleft:xleft+window], (64,64))
+            window_image = cv2.resize(image[ytop:ytop+window, xleft:xleft+window], (64,64))
 
-            window_features = window_hog_features
-            window_features = window_features.reshape(1, -1)
+            spatial_features = bin_spatial(window_image)
+            hist_features = color_hist(window_image)
+            window_features = np.hstack((window_hog_features, spatial_features, hist_features)).reshape(1, -1)
             scaled_window_features = X_scaler.transform(window_features)
             prediction = svc.predict(scaled_window_features)
 
@@ -158,12 +175,17 @@ def draw_bbox(image, bbox_list):
     return draw_image
 
 
-def build_heatmap(image, bbox_list, threshold):
+def build_heatmap(image, bbox_list):
     heatmap = np.zeros_like(image[:,:,0], np.uint8)
     for b in bbox_list:
         heatmap[b[0][1]:b[1][1], b[0][0]:b[1][0]] += 1
-    heatmap[heatmap <= threshold] = 0
     return heatmap
+
+
+def heatmap_threshold(heatmap, threshold):
+    heatmap_thresh = np.copy(heatmap)
+    heatmap_thresh[heatmap_thresh <= threshold] = 0
+    return heatmap_thresh
 
 
 def extract_bbox(heatmap):
@@ -185,26 +207,26 @@ if __name__ == '__main__':
     else:
         X_scaler, svc = load_model()
 
-    image = mpimg.imread('test_images/test1.jpg')
+    image = mpimg.imread('test_images/test4.jpg')
     assert(image.dtype == np.uint8)
     image = image.astype(np.float32) / 255
     
-    S_bbox_list = find_cars(image, 0.5, 400, 550, X_scaler, svc)
-    M_bbox_list = find_cars(image, 1.5, 400, 650, X_scaler, svc)
-    L_bbox_list = find_cars(image, 2, 500, 650, X_scaler, svc)
-    bbox_list = S_bbox_list + M_bbox_list + L_bbox_list
-
-    annoted = draw_bbox(image, bbox_list)
-    plt.figure()
-    plt.imshow(annoted)
+    bbox_list = find_cars(image, 1.5, 400, 650, X_scaler, svc)
+    detection = draw_bbox(image, bbox_list)
     
-    heatmap = build_heatmap(image, bbox_list, 1)
-    plt.figure()
-    plt.imshow(heatmap, cmap='hot')
+    heatmap = build_heatmap(image, bbox_list)
+    heatmap_thresh = heatmap_threshold(heatmap, 1)
 
-    bbox_list = extract_bbox(heatmap)
+    bbox_list = extract_bbox(heatmap_thresh)
     annoted = draw_bbox(image, bbox_list)
-    plt.figure()
-    plt.imshow(annoted)
 
+    f, ax = plt.subplots(2, 2)
+    ax[0, 0].set_title('detection')
+    ax[0, 0].imshow(detection)
+    ax[0, 1].set_title('heatmap')
+    ax[0, 1].imshow(heatmap, cmap='hot')
+    ax[1, 0].set_title('heatmap_thresh')
+    ax[1, 0].imshow(heatmap_thresh, cmap='hot')
+    ax[1, 1].set_title('annoted')
+    ax[1, 1].imshow(annoted)
     plt.show()
