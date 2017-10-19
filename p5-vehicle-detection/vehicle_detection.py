@@ -12,6 +12,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from skimage.feature import hog
 from scipy.ndimage.measurements import label
+from moviepy.editor import VideoFileClip
 
 
 def get_hog_features(gray,
@@ -42,7 +43,7 @@ def get_hog_features(gray,
         return features
 
 
-def bin_spatial(image, size=(32, 32)):
+def bin_spatial(image, size=(16, 16)):
     features = cv2.resize(image, size).ravel()
     return features
 
@@ -62,7 +63,7 @@ def extract_features(image):
     hog_features = []
     for channel in range(image.shape[2]):
         hog_features.append(get_hog_features(image[:,:,channel],
-                                             orientations=9,
+                                             orientations=12,
                                              pixels_per_cell=8,
                                              cells_per_block=2,
                                              visualise=False,
@@ -86,6 +87,7 @@ def train_model():
     notcar_images = []
     notcar_images.extend(glob.glob('non-vehicles/Extras/extra*.png'))
     notcar_images.extend(glob.glob('non-vehicles/GTI/image*.png'))
+    notcar_images.extend(glob.glob('teach_images/*.png'))
     print(len(notcar_images))
     t2 = time.time()
 
@@ -121,7 +123,6 @@ def train_model():
 def load_model():
     X_scaler = joblib.load('X_scaler.pkl')
     svc = joblib.load('svc.pkl')
-    print('model loaded')
     return X_scaler, svc
 
 # `image` should be np.float32 and pixel data range is [0, 1]
@@ -138,14 +139,14 @@ def find_cars(image, scale, ystart, ystop, X_scaler, svc):
     pixels_per_cell = 8
     cells_per_block = 2
     window = 64
-    cell_per_step = 2
+    cell_per_step = 4
     block_per_window = window // pixels_per_cell - cells_per_block + 1
 
     xsteps = (w // pixels_per_cell - window // pixels_per_cell) // cell_per_step + 1
     ysteps = (h // pixels_per_cell - window // pixels_per_cell) // cell_per_step + 1
 
     channels = [image[:,:,0], image[:,:,1], image[:,:,2]]
-    hogs = [get_hog_features(c, 9, pixels_per_cell, cells_per_block, visualise=False, feature_vector=False) for c in channels]
+    hogs = [get_hog_features(c, 12, pixels_per_cell, cells_per_block, visualise=False, feature_vector=False) for c in channels]
 
     bbox_list = []
     for xstep in range(xsteps):
@@ -241,24 +242,38 @@ def udacity_dataset_features():
                 return car_features, notcar_features
 
 
-if __name__ == '__main__':
-    if len(sys.argv) == 2 and sys.argv[1] == 'train':
-        X_scaler, svc = train_model()
-    else:
-        X_scaler, svc = load_model()
+def process(image):
+    X_scaler, svc = load_model()
 
-    image = mpimg.imread('test_images/test4.jpg')
     assert(image.dtype == np.uint8)
     image = image.astype(np.float32) / 255
     
     l_bbox_list = find_cars(image, 2, 400, 650, X_scaler, svc)
     m_bbox_list = find_cars(image, 1.5, 400, 650, X_scaler, svc)
-    s_bbox_list = find_cars(image, 1, 400, 650, X_scaler, svc)
+    s_bbox_list = find_cars(image, 1, 400, 500, X_scaler, svc)
+    bbox_list = l_bbox_list + m_bbox_list + s_bbox_list
+
+    heatmap = build_heatmap(image, bbox_list)
+    heatmap_thresh = heatmap_threshold(heatmap, 2)
+
+    bbox_list = extract_bbox(heatmap_thresh)
+    annoted = draw_bbox(image, bbox_list)
+    return (annoted*255).astype(np.uint8)
+
+
+def test(X_scaler, svc):
+    image = mpimg.imread('test_images/test11.jpg')
+    assert(image.dtype == np.uint8)
+    image = image.astype(np.float32) / 255
+    
+    l_bbox_list = find_cars(image, 2, 400, 650, X_scaler, svc)
+    m_bbox_list = find_cars(image, 1.5, 400, 650, X_scaler, svc)
+    s_bbox_list = find_cars(image, 1, 400, 500, X_scaler, svc)
     bbox_list = l_bbox_list + m_bbox_list + s_bbox_list
     detection = draw_bbox(image, bbox_list)
     
     heatmap = build_heatmap(image, bbox_list)
-    heatmap_thresh = heatmap_threshold(heatmap, 7)
+    heatmap_thresh = heatmap_threshold(heatmap, 2)
 
     bbox_list = extract_bbox(heatmap_thresh)
     annoted = draw_bbox(image, bbox_list)
@@ -273,3 +288,29 @@ if __name__ == '__main__':
     ax[1, 1].set_title('annoted')
     ax[1, 1].imshow(annoted)
     plt.show()
+
+if __name__ == '__main__':
+    if len(sys.argv) == 2 and sys.argv[1] == 'train':
+        X_scaler, svc = train_model()
+    else:
+        X_scaler, svc = load_model()
+
+    # test(X_scaler, svc)
+
+    # clip = VideoFileClip("test_video.mp4")
+    # clip.save_frame('test_images/test07.jpg', 0.7)
+    # clip.save_frame('test_images/test08.jpg', 0.8)
+    # clip.save_frame('test_images/test09.jpg', 0.9)
+    # clip.save_frame('test_images/test10.jpg', 1.0)
+    # clip.save_frame('test_images/test11.jpg', 1.1)
+    # clip.save_frame('test_images/test12.jpg', 1.2)
+    # clip.save_frame('test_images/test13.jpg', 1.3)
+    # clip.save_frame('test_images/test14.jpg', 1.4)
+    # clip.save_frame('test_images/test15.jpg', 1.5)
+    # clip.save_frame('test_images/test16.jpg', 1.6)
+    # clip.save_frame('test_images/test17.jpg', 1.7)
+
+    output_path  = 'test_videos_output/project_video.mp4'
+    input_clip = VideoFileClip("project_video.mp4")
+    output_clip = input_clip.fl_image(process)
+    output_clip.write_videofile(output_path, audio=False)
