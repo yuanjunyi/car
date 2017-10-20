@@ -43,6 +43,7 @@ if __name__ == '__main__':
 		'test_images/test17.jpg',
 	]
 	for filename in filenames:
-		for window in range(64, 280, 8):
-			extract(filename, window, xmin=0, xmax=800, ymin=400, ymax=700)
-			extract(filename, window, xmin=700, xmax=1000, ymin=500, ymax=700)
+		for delta in range(0, 64, 8):
+			for window in range(64, 280, 8):
+				extract(filename, window, xmin=0+delta, xmax=800, ymin=400+delta, ymax=700)
+				extract(filename, window, xmin=700+delta, xmax=1000, ymin=500+delta, ymax=700)

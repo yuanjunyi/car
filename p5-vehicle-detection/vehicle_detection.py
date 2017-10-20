@@ -3,6 +3,7 @@ import cv2
 import glob
 import time
 import csv
+import itertools
 import numpy as np
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
@@ -13,6 +14,11 @@ from sklearn.model_selection import train_test_split
 from skimage.feature import hog
 from scipy.ndimage.measurements import label
 from moviepy.editor import VideoFileClip
+
+
+P = {
+    'orientations': 9,
+}
 
 
 def get_hog_features(gray,
@@ -49,7 +55,6 @@ def bin_spatial(image, size=(16, 16)):
 
 # `image` should be np.float32 and pixel data range is [0, 1]
 def color_hist(image, nbins=32, bins_range=(0, 1)):
-    assert(image.dtype == np.float32)
     hist_features = []
     for channel in range(image.shape[2]):
         hist, bin_edges = np.histogram(image[:,:,channel], bins=nbins, range=bins_range)
@@ -58,20 +63,19 @@ def color_hist(image, nbins=32, bins_range=(0, 1)):
 
 # `image` should be np.float32 and pixel data range is [0, 1] 
 def extract_features(image):
-    assert(image.dtype == np.float32)
     image = cv2.cvtColor(image, cv2.COLOR_RGB2YCrCb)
     hog_features = []
     for channel in range(image.shape[2]):
         hog_features.append(get_hog_features(image[:,:,channel],
-                                             orientations=12,
+                                             orientations=P['orientations'],
                                              pixels_per_cell=8,
                                              cells_per_block=2,
                                              visualise=False,
                                              feature_vector=True))
     features = []
     features.append(np.concatenate(hog_features))
-    features.append(bin_spatial(image))
-    features.append(color_hist(image))
+    # features.append(bin_spatial(image))
+    # features.append(color_hist(image))
     return np.concatenate(features)
 
 
@@ -82,18 +86,22 @@ def train_model():
     car_images.extend(glob.glob('vehicles/GTI_MiddleClose/image*.png'))
     car_images.extend(glob.glob('vehicles/GTI_Right/image*.png'))
     car_images.extend(glob.glob('vehicles/KITTI_extracted/*.png'))
-    print(len(car_images))
+    print('car', len(car_images))
 
     notcar_images = []
     notcar_images.extend(glob.glob('non-vehicles/Extras/extra*.png'))
     notcar_images.extend(glob.glob('non-vehicles/GTI/image*.png'))
     notcar_images.extend(glob.glob('teach_images/*.png'))
-    print(len(notcar_images))
+    print('notcar', len(notcar_images))
     t2 = time.time()
 
     print('extracting features...')
     car_features = [extract_features(mpimg.imread(f)) for f in car_images]
     notcar_features = [extract_features(mpimg.imread(f)) for f in notcar_images]
+    
+    # udacity_car_features = udacity_dataset_car_features(5000)
+    # car_features.extend(udacity_car_features)
+
     # udacity_car_features, udacity_notcar_features = udacity_dataset_features()
     # car_features.extend(udacity_car_features)
     # notcar_features.extend(udacity_notcar_features)
@@ -127,7 +135,6 @@ def load_model():
 
 # `image` should be np.float32 and pixel data range is [0, 1]
 def find_cars(image, scale, ystart, ystop, X_scaler, svc):
-    assert(image.dtype == np.float32)
     draw_image = np.copy(image)
 
     image = cv2.cvtColor(image, cv2.COLOR_RGB2YCrCb)
@@ -139,14 +146,14 @@ def find_cars(image, scale, ystart, ystop, X_scaler, svc):
     pixels_per_cell = 8
     cells_per_block = 2
     window = 64
-    cell_per_step = 4
+    cell_per_step = 2
     block_per_window = window // pixels_per_cell - cells_per_block + 1
 
     xsteps = (w // pixels_per_cell - window // pixels_per_cell) // cell_per_step + 1
     ysteps = (h // pixels_per_cell - window // pixels_per_cell) // cell_per_step + 1
 
     channels = [image[:,:,0], image[:,:,1], image[:,:,2]]
-    hogs = [get_hog_features(c, 12, pixels_per_cell, cells_per_block, visualise=False, feature_vector=False) for c in channels]
+    hogs = [get_hog_features(c, P['orientations'], pixels_per_cell, cells_per_block, visualise=False, feature_vector=False) for c in channels]
 
     bbox_list = []
     for xstep in range(xsteps):
@@ -159,11 +166,12 @@ def find_cars(image, scale, ystart, ystop, X_scaler, svc):
 
             xleft = xcell * pixels_per_cell
             ytop = ycell * pixels_per_cell
-            window_image = cv2.resize(image[ytop:ytop+window, xleft:xleft+window], (64,64))
+            # window_image = cv2.resize(image[ytop:ytop+window, xleft:xleft+window], (64,64))
 
-            spatial_features = bin_spatial(window_image)
-            hist_features = color_hist(window_image)
-            window_features = np.hstack((window_hog_features, spatial_features, hist_features)).reshape(1, -1)
+            # spatial_features = bin_spatial(window_image)
+            # hist_features = color_hist(window_image)
+            # window_features = np.hstack((window_hog_features, spatial_features, hist_features)).reshape(1, -1)
+            window_features = window_hog_features.reshape(1, -1)
             scaled_window_features = X_scaler.transform(window_features)
             prediction = svc.predict(scaled_window_features)
 
@@ -224,6 +232,19 @@ def extract_features_row(row):
         return extract_features(patch)
 
 
+def udacity_dataset_car_features(N):
+    car_features = []
+    with open('object-detection-crowdai/labels.csv') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            if row['Label'] == 'Car' and len(car_features) < N:
+                features = extract_features_row(row)
+                if features is not None:
+                    car_features.append(features)
+                    if len(car_features) == N:
+                        return car_features
+
+
 def udacity_dataset_features():
     car_features = []
     notcar_features = []
@@ -242,19 +263,23 @@ def udacity_dataset_features():
                 return car_features, notcar_features
 
 
+bbox_list_buffer = []
 def process(image):
     X_scaler, svc = load_model()
-
-    assert(image.dtype == np.uint8)
     image = image.astype(np.float32) / 255
     
-    l_bbox_list = find_cars(image, 2, 400, 650, X_scaler, svc)
-    m_bbox_list = find_cars(image, 1.5, 400, 650, X_scaler, svc)
-    s_bbox_list = find_cars(image, 1, 400, 500, X_scaler, svc)
-    bbox_list = l_bbox_list + m_bbox_list + s_bbox_list
+    bbox_list = []
+    bbox_list.extend(find_cars(image, 2, 400, 700, X_scaler, svc))
+    bbox_list.extend(find_cars(image, 1.5, 400, 700, X_scaler, svc))
 
-    heatmap = build_heatmap(image, bbox_list)
-    heatmap_thresh = heatmap_threshold(heatmap, 2)
+    # global bbox_list_buffer
+    if len(bbox_list_buffer) == 3:
+        bbox_list_buffer.pop(0)
+    bbox_list_buffer.append(bbox_list)
+    accumulated_bbox_list = list(itertools.chain.from_iterable(bbox_list_buffer))
+
+    heatmap = build_heatmap(image, accumulated_bbox_list)
+    heatmap_thresh = heatmap_threshold(heatmap, 12)
 
     bbox_list = extract_bbox(heatmap_thresh)
     annoted = draw_bbox(image, bbox_list)
@@ -266,10 +291,9 @@ def test(X_scaler, svc):
     assert(image.dtype == np.uint8)
     image = image.astype(np.float32) / 255
     
-    l_bbox_list = find_cars(image, 2, 400, 650, X_scaler, svc)
-    m_bbox_list = find_cars(image, 1.5, 400, 650, X_scaler, svc)
-    s_bbox_list = find_cars(image, 1, 400, 500, X_scaler, svc)
-    bbox_list = l_bbox_list + m_bbox_list + s_bbox_list
+    bbox_list = []
+    bbox_list.extend(find_cars(image, 2, 400, 700, X_scaler, svc))
+    bbox_list.extend(find_cars(image, 1.5, 400, 700, X_scaler, svc))
     detection = draw_bbox(image, bbox_list)
     
     heatmap = build_heatmap(image, bbox_list)
@@ -295,7 +319,7 @@ if __name__ == '__main__':
     else:
         X_scaler, svc = load_model()
 
-    # test(X_scaler, svc)
+    test(X_scaler, svc)
 
     # clip = VideoFileClip("test_video.mp4")
     # clip.save_frame('test_images/test07.jpg', 0.7)
@@ -310,7 +334,7 @@ if __name__ == '__main__':
     # clip.save_frame('test_images/test16.jpg', 1.6)
     # clip.save_frame('test_images/test17.jpg', 1.7)
 
-    output_path  = 'test_videos_output/project_video.mp4'
-    input_clip = VideoFileClip("project_video.mp4")
-    output_clip = input_clip.fl_image(process)
-    output_clip.write_videofile(output_path, audio=False)
+    # output_path  = 'test_videos_output/test_video.mp4'
+    # input_clip = VideoFileClip("test_video.mp4")
+    # output_clip = input_clip.fl_image(process)
+    # output_clip.write_videofile(output_path, audio=False)
