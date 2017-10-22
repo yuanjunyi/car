@@ -9,7 +9,7 @@ from moviepy.editor import VideoFileClip
 
 P = {
     'm_per_pixel_y': 30 / 720,
-    'm_per_pixel_x': 3.7 / 700
+    'm_per_pixel_x': 3.7 / 640
 }
 
 
