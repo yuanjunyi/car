@@ -93,4 +93,4 @@ The main problem I faced is the accuracy of the classifier. Although the test ac
 
 So I decided to collect more not car training data. I extracted the frames that the model made wrong predictions and run a script named `extract.py` to extract the subimages. Then I added these images to the training set. Unfortunatly all the effort of increasing the training set didn't pay off. After discussing with my mentor, I decided to focus on the pipeline to filter the false positive detection.
 
-The final implementation of the pipeline used a buffer to keep the detection of 5 continus frames. A heatmap is built using 5 frames's detection and a larger threshold is applied on the accumulated heatmap. This method filtered the false positive detection to some extend.
+The final implementation of the pipeline used a buffer to keep the detection of 5 continus frames. A heatmap is built using 5 frames's detection and a larger threshold is applied on the accumulated heatmap. This method filtered the false positive detection to some extent.
