@@ -36,9 +36,7 @@ I started by reading in all the `vehicle` and `non-vehicle` images.  Here is an 
 
 ![alt text][image1]
 
-I then explored different color spaces and different `skimage.hog()` parameters (`orientations`, `pixels_per_cell`, and `cells_per_block`).  I grabbed random images from each of the two classes and displayed them to get a feel for what the `skimage.hog()` output looks like.
-
-Here is an example using the `YCrCb` color space and HOG parameters of `orientations=9`, `pixels_per_cell=(8, 8)` and `cells_per_block=(2, 2)`:
+I then explored different color spaces and different `skimage.hog()` parameters (`orientations`, `pixels_per_cell`, and `cells_per_block`). Here is an example using the `YCrCb` color space and HOG parameters of `orientations=9`, `pixels_per_cell=(8, 8)` and `cells_per_block=(2, 2)`:
 
 
 ![alt text][image2]
@@ -92,7 +90,7 @@ I recorded the positions of positive detections in each frame of the video.  Fro
 
 #### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
-The main problem I faced is the accuracy of the classifier. Although the test accuracy was quite high and over 98%, the model didn't generalize well when being tested on the video stream. Spefificly, it always made wrong prediction on not car samples.
+The main problem I faced is the accuracy of the classifier. Although the test accuracy was quite high and over 98%, the model didn't generalize well when being tested on the video stream. Speificly, it always made wrong prediction on not car samples.
 
 So I decided to collect more not car training data. I extracted the frames that the model made wrong predictions and run a script named `extract.py` to extract the subimages. Then I added these images to the training set. Unfortunatly all the effort of increasing the training set didn't pay off. After discussing with my mentor, I decided to focus on the pipeline to filter the false positive detection.
 
