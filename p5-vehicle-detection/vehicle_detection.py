@@ -258,9 +258,9 @@ def process(image):
     image = image.astype(np.float32) / 255
     
     bbox_list = []
-    bbox_list.extend(find_cars(image, 1, 800, 1250, 350, 500, X_scaler, svc))
-    bbox_list.extend(find_cars(image, 1.5, 800, 1250, 350, 500, X_scaler, svc))
-    bbox_list.extend(find_cars(image, 2, 800, 1250, 350, 700, X_scaler, svc))
+    bbox_list.extend(find_cars(image, 1, 800, 1280, 350, 500, X_scaler, svc))
+    bbox_list.extend(find_cars(image, 1.5, 800, 1280, 350, 500, X_scaler, svc))
+    bbox_list.extend(find_cars(image, 2, 800, 1280, 350, 700, X_scaler, svc))
 
     if len(bbox_list_buffer) == 5:
         bbox_list_buffer.pop(0)
@@ -281,9 +281,9 @@ def test(X_scaler, svc):
     image = image.astype(np.float32) / 255
     
     bbox_list = []
-    bbox_list.extend(find_cars(image, 1, 800, 1250, 350, 500, X_scaler, svc))
-    bbox_list.extend(find_cars(image, 1.5, 800, 1250, 350, 500, X_scaler, svc))
-    bbox_list.extend(find_cars(image, 2, 800, 1250, 350, 700, X_scaler, svc))
+    bbox_list.extend(find_cars(image, 1, 800, 1280, 350, 500, X_scaler, svc))
+    bbox_list.extend(find_cars(image, 1.5, 800, 1280, 350, 500, X_scaler, svc))
+    bbox_list.extend(find_cars(image, 2, 800, 1280, 350, 700, X_scaler, svc))
     detection = draw_bbox(image, bbox_list)
     
     heatmap = build_heatmap(image, bbox_list)
