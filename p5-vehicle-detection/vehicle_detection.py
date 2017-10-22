@@ -16,11 +16,6 @@ from scipy.ndimage.measurements import label
 from moviepy.editor import VideoFileClip
 
 
-P = {
-    'orientations': 9,
-}
-
-
 def get_hog_features(gray,
                      orientations,
                      pixels_per_cell,
@@ -34,7 +29,6 @@ def get_hog_features(gray,
                                   cells_per_block=(cells_per_block, cells_per_block),
                                   block_norm='L2-Hys',
                                   visualise=visualise,
-                                  transform_sqrt=True,
                                   feature_vector=feature_vector)
         return features, hog_image
     else:      
@@ -44,7 +38,6 @@ def get_hog_features(gray,
                        cells_per_block=(cells_per_block, cells_per_block),
                        block_norm='L2-Hys',
                        visualise=visualise,
-                       transform_sqrt=True,
                        feature_vector=feature_vector)
         return features
 
@@ -52,6 +45,7 @@ def get_hog_features(gray,
 def bin_spatial(image, size=(16, 16)):
     features = cv2.resize(image, size).ravel()
     return features
+
 
 # `image` should be np.float32 and pixel data range is [0, 1]
 def color_hist(image, nbins=32, bins_range=(0, 1)):
@@ -61,21 +55,22 @@ def color_hist(image, nbins=32, bins_range=(0, 1)):
         hist_features.append(hist)
     return np.concatenate(hist_features)
 
+
 # `image` should be np.float32 and pixel data range is [0, 1] 
 def extract_features(image):
     image = cv2.cvtColor(image, cv2.COLOR_RGB2YCrCb)
     hog_features = []
     for channel in range(image.shape[2]):
         hog_features.append(get_hog_features(image[:,:,channel],
-                                             orientations=P['orientations'],
+                                             orientations=9,
                                              pixels_per_cell=8,
                                              cells_per_block=2,
                                              visualise=False,
                                              feature_vector=True))
     features = []
     features.append(np.concatenate(hog_features))
-    # features.append(bin_spatial(image))
-    # features.append(color_hist(image))
+    features.append(bin_spatial(image))
+    features.append(color_hist(image))
     return np.concatenate(features)
 
 
@@ -91,20 +86,14 @@ def train_model():
     notcar_images = []
     notcar_images.extend(glob.glob('non-vehicles/Extras/extra*.png'))
     notcar_images.extend(glob.glob('non-vehicles/GTI/image*.png'))
-    notcar_images.extend(glob.glob('teach_images/*.png'))
+    notcar_images.extend(glob.glob('non-vehicles/Video_extracted/*.png'))
     print('notcar', len(notcar_images))
     t2 = time.time()
 
-    print('extracting features...')
+    print('extracting car features...')
     car_features = [extract_features(mpimg.imread(f)) for f in car_images]
+    print('extracting notcar features...')
     notcar_features = [extract_features(mpimg.imread(f)) for f in notcar_images]
-    
-    # udacity_car_features = udacity_dataset_car_features(5000)
-    # car_features.extend(udacity_car_features)
-
-    # udacity_car_features, udacity_notcar_features = udacity_dataset_features()
-    # car_features.extend(udacity_car_features)
-    # notcar_features.extend(udacity_notcar_features)
 
     X = np.vstack((car_features, notcar_features)).astype(np.float64)
     X_scaler = StandardScaler().fit(X)
@@ -133,12 +122,13 @@ def load_model():
     svc = joblib.load('svc.pkl')
     return X_scaler, svc
 
+
 # `image` should be np.float32 and pixel data range is [0, 1]
-def find_cars(image, scale, ystart, ystop, X_scaler, svc):
+def find_cars(image, scale, xstart, xstop, ystart, ystop, X_scaler, svc):
     draw_image = np.copy(image)
 
     image = cv2.cvtColor(image, cv2.COLOR_RGB2YCrCb)
-    image = image[ystart:ystop, :, :]
+    image = image[ystart:ystop, xstart:xstop, :]
     h, w = image.shape[:2]
     image = cv2.resize(image, (int(w/scale), int(h/scale)))
     h, w = image.shape[:2]
@@ -153,7 +143,7 @@ def find_cars(image, scale, ystart, ystop, X_scaler, svc):
     ysteps = (h // pixels_per_cell - window // pixels_per_cell) // cell_per_step + 1
 
     channels = [image[:,:,0], image[:,:,1], image[:,:,2]]
-    hogs = [get_hog_features(c, P['orientations'], pixels_per_cell, cells_per_block, visualise=False, feature_vector=False) for c in channels]
+    hogs = [get_hog_features(c, 9, pixels_per_cell, cells_per_block, visualise=False, feature_vector=False) for c in channels]
 
     bbox_list = []
     for xstep in range(xsteps):
@@ -166,12 +156,11 @@ def find_cars(image, scale, ystart, ystop, X_scaler, svc):
 
             xleft = xcell * pixels_per_cell
             ytop = ycell * pixels_per_cell
-            # window_image = cv2.resize(image[ytop:ytop+window, xleft:xleft+window], (64,64))
+            window_image = cv2.resize(image[ytop:ytop+window, xleft:xleft+window], (64,64))
 
-            # spatial_features = bin_spatial(window_image)
-            # hist_features = color_hist(window_image)
-            # window_features = np.hstack((window_hog_features, spatial_features, hist_features)).reshape(1, -1)
-            window_features = window_hog_features.reshape(1, -1)
+            spatial_features = bin_spatial(window_image)
+            hist_features = color_hist(window_image)
+            window_features = np.hstack((window_hog_features, spatial_features, hist_features)).reshape(1, -1)
             scaled_window_features = X_scaler.transform(window_features)
             prediction = svc.predict(scaled_window_features)
 
@@ -179,8 +168,8 @@ def find_cars(image, scale, ystart, ystop, X_scaler, svc):
                 unscaled_xleft = np.int(xleft*scale)
                 unscaled_ytop = np.int(ytop*scale)
                 unscaled_window = np.int(window*scale)
-                bbox_list.append(((unscaled_xleft, unscaled_ytop+ystart),
-                                  (unscaled_xleft+unscaled_window, unscaled_ytop+ystart+unscaled_window)))
+                bbox_list.append(((unscaled_xleft+xstart, unscaled_ytop+ystart),
+                                  (unscaled_xleft+xstart+unscaled_window, unscaled_ytop+ystart+unscaled_window)))
     return bbox_list
 
 
@@ -245,21 +234,21 @@ def udacity_dataset_car_features(N):
                         return car_features
 
 
-def udacity_dataset_features():
+def udacity_dataset_features(N):
     car_features = []
     notcar_features = []
     with open('object-detection-crowdai/labels.csv') as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
-            if row['Label'] == 'Car' and len(car_features) < 5000:
+            if row['Label'] == 'Car' and len(car_features) < N:
                 features = extract_features_row(row)
                 if features is not None:
                     car_features.append(features)
-            if row['Label'] == 'Pedestrian' and len(notcar_features) < 5000:
+            if row['Label'] == 'Pedestrian' and len(notcar_features) < N:
                 features = extract_features_row(row)
                 if features is not None:
                     notcar_features.append(features)
-            if len(car_features) == 5000 and len(notcar_features) == 5000:
+            if len(car_features) == N and len(notcar_features) == N:
                 return car_features, notcar_features
 
 
@@ -269,17 +258,17 @@ def process(image):
     image = image.astype(np.float32) / 255
     
     bbox_list = []
-    bbox_list.extend(find_cars(image, 2, 400, 700, X_scaler, svc))
-    bbox_list.extend(find_cars(image, 1.5, 400, 700, X_scaler, svc))
+    bbox_list.extend(find_cars(image, 1, 800, 1250, 350, 500, X_scaler, svc))
+    bbox_list.extend(find_cars(image, 1.5, 800, 1250, 350, 500, X_scaler, svc))
+    bbox_list.extend(find_cars(image, 2, 800, 1250, 350, 700, X_scaler, svc))
 
-    # global bbox_list_buffer
-    if len(bbox_list_buffer) == 3:
+    if len(bbox_list_buffer) == 5:
         bbox_list_buffer.pop(0)
     bbox_list_buffer.append(bbox_list)
     accumulated_bbox_list = list(itertools.chain.from_iterable(bbox_list_buffer))
 
     heatmap = build_heatmap(image, accumulated_bbox_list)
-    heatmap_thresh = heatmap_threshold(heatmap, 12)
+    heatmap_thresh = heatmap_threshold(heatmap, 10)
 
     bbox_list = extract_bbox(heatmap_thresh)
     annoted = draw_bbox(image, bbox_list)
@@ -287,13 +276,14 @@ def process(image):
 
 
 def test(X_scaler, svc):
-    image = mpimg.imread('test_images/test11.jpg')
+    image = mpimg.imread('test_images/test252.jpg')
     assert(image.dtype == np.uint8)
     image = image.astype(np.float32) / 255
     
     bbox_list = []
-    bbox_list.extend(find_cars(image, 2, 400, 700, X_scaler, svc))
-    bbox_list.extend(find_cars(image, 1.5, 400, 700, X_scaler, svc))
+    bbox_list.extend(find_cars(image, 1, 800, 1250, 350, 500, X_scaler, svc))
+    bbox_list.extend(find_cars(image, 1.5, 800, 1250, 350, 500, X_scaler, svc))
+    bbox_list.extend(find_cars(image, 2, 800, 1250, 350, 700, X_scaler, svc))
     detection = draw_bbox(image, bbox_list)
     
     heatmap = build_heatmap(image, bbox_list)
@@ -319,22 +309,16 @@ if __name__ == '__main__':
     else:
         X_scaler, svc = load_model()
 
-    test(X_scaler, svc)
+    # test(X_scaler, svc)
 
-    # clip = VideoFileClip("test_video.mp4")
-    # clip.save_frame('test_images/test07.jpg', 0.7)
-    # clip.save_frame('test_images/test08.jpg', 0.8)
-    # clip.save_frame('test_images/test09.jpg', 0.9)
-    # clip.save_frame('test_images/test10.jpg', 1.0)
-    # clip.save_frame('test_images/test11.jpg', 1.1)
-    # clip.save_frame('test_images/test12.jpg', 1.2)
-    # clip.save_frame('test_images/test13.jpg', 1.3)
-    # clip.save_frame('test_images/test14.jpg', 1.4)
-    # clip.save_frame('test_images/test15.jpg', 1.5)
-    # clip.save_frame('test_images/test16.jpg', 1.6)
-    # clip.save_frame('test_images/test17.jpg', 1.7)
+    # clip = VideoFileClip("project_video.mp4")
+    # clip.save_frame('test_images/test246.jpg', 24.6)
+    # clip.save_frame('test_images/test247.jpg', 24.7)
+    # clip.save_frame('test_images/test248.jpg', 24.8)
+    # clip.save_frame('test_images/test249.jpg', 24.9)
+    # clip.save_frame('test_images/test250.jpg', 25.0)
 
-    # output_path  = 'test_videos_output/test_video.mp4'
-    # input_clip = VideoFileClip("test_video.mp4")
-    # output_clip = input_clip.fl_image(process)
-    # output_clip.write_videofile(output_path, audio=False)
+    output_path  = 'test_videos_output/project_video.mp4'
+    input_clip = VideoFileClip("project_video.mp4")
+    output_clip = input_clip.fl_image(process)
+    output_clip.write_videofile(output_path, audio=False)

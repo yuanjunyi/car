@@ -10,26 +10,20 @@ count = 0
 def extract(filename, window, xmin, xmax, ymin, ymax):
 	global count
 	img = mpimg.imread(filename)
-	for x in range(xmin, xmax, window):
-		for y in range(ymin, ymax, window):
+	for x in range(xmin, xmax, 16):
+		for y in range(ymin, ymax, 16):
 			subimg = img[y:min(y+window,ymax), x:min(x+window,xmax)]
 			h, w = subimg.shape[:2]
 			if w == 64 and h == 64:
-				mpimg.imsave('teach_images/%d.png' % count, subimg)
+				mpimg.imsave('non-vehicles/Video_extracted/%d.png' % count, subimg)
 				count += 1
 			if w > 64 and h > 64:
 				subimg = cv2.resize(subimg, (64, 64))
-				mpimg.imsave('teach_images/%d.png' % count, subimg)
+				mpimg.imsave('non-vehicles/Video_extracted/%d.png' % count, subimg)
 				count += 1
 
 if __name__ == '__main__':
 	filenames = [
-		'test_images/test1.jpg',
-		'test_images/test2.jpg',
-		'test_images/test3.jpg',
-		'test_images/test4.jpg',
-		'test_images/test5.jpg',
-		'test_images/test6.jpg',
 		'test_images/test07.jpg',
 		'test_images/test08.jpg',
 		'test_images/test09.jpg',
@@ -41,9 +35,13 @@ if __name__ == '__main__':
 		'test_images/test15.jpg',
 		'test_images/test16.jpg',
 		'test_images/test17.jpg',
+		'test_images/test231.jpg',
+		'test_images/test232.jpg',
+		'test_images/test233.jpg',
+		'test_images/test234.jpg',
+		'test_images/test235.jpg'
 	]
 	for filename in filenames:
-		for delta in range(0, 64, 8):
-			for window in range(64, 280, 8):
-				extract(filename, window, xmin=0+delta, xmax=800, ymin=400+delta, ymax=700)
-				extract(filename, window, xmin=700+delta, xmax=1000, ymin=500+delta, ymax=700)
+		print('extracting', filename)
+		for window in (64, 96, 128):
+			extract(filename, window, xmin=0, xmax=1200, ymin=450, ymax=700)
