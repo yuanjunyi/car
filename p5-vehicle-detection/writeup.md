@@ -30,7 +30,7 @@ You're reading it!
 
 #### 1. Explain how (and identify where in your code) you extracted HOG features from the training images.
 
-The code for this step is contained in lines #60 through #74 of the file called `vehicle_detection.py`).
+The code for this step is contained in lines #60 through #74 of the file called `vehicle_detection.py`.
 
 I started by reading in all the `vehicle` and `non-vehicle` images.  Here is an example of one of each of the `vehicle` and `non-vehicle` classes:
 
@@ -38,12 +38,11 @@ I started by reading in all the `vehicle` and `non-vehicle` images.  Here is an 
 
 I then explored different color spaces and different `skimage.hog()` parameters (`orientations`, `pixels_per_cell`, and `cells_per_block`). Here is an example using the `YCrCb` color space and HOG parameters of `orientations=9`, `pixels_per_cell=(8, 8)` and `cells_per_block=(2, 2)`:
 
-
 ![alt text][image2]
 
 #### 2. Explain how you settled on your final choice of HOG parameters.
 
-I tried various combinations of parameters and trained a linear SVM for each combination respectively. I used 20% percent of the dataset as the cross validation set and it turned out the performance of the various combinations were quite close: most of them had an over 98% accuracy set. So I decided to stop optimizing the model and focused on the pipelile. The final choice of HOG parameters is: `orientations=9`, `pixels_per_cell=(8, 8)` and `cells_per_block=(2, 2)`.
+I tried various combinations of parameters and for each combination I trained a linear SVM respectively. I used 20% percent of the dataset as the cross validation set and it turned out the performance of the various combinations were quite close: most of them had an over 98% test accuracy. So I decided to stop optimizing the model and focused on the pipeline. The final choice of HOG parameters is: `orientations=9`, `pixels_per_cell=(8, 8)` and `cells_per_block=(2, 2)`.
 
 #### 3. Describe how (and identify where in your code) you trained a classifier using your selected HOG features (and color features if you used them).
 
@@ -61,14 +60,14 @@ I decided to restrict the sliding window search to the right part of the image a
 | `xstart=800`, `xstop=1280`, `ystart=350`, `ystop=500`| `96`         |
 | `xstart=800`, `xstop=1280`, `ystart=350`, `ystop=700`| `128`        |
 
-
-The overlap between adjcent windows are 2 cells, which is 16 pixels.
+The overlap between adjcent windows is 2 cells, which is 16 pixels.
 
 #### 2. Show some examples of test images to demonstrate how your pipeline is working.  What did you do to optimize the performance of your classifier?
 
 Ultimately I searched on 3 scales using YCrCb 3-channel HOG features plus spatially binned color and histograms of color in the feature vector, which provided a nice result.  Here are some example images:
 
 ![alt text][image3]
+
 ---
 
 ### Video Implementation
@@ -76,12 +75,12 @@ Ultimately I searched on 3 scales using YCrCb 3-channel HOG features plus spatia
 #### 1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (somewhat wobbly or unstable bounding boxes are ok as long as you are identifying the vehicles most of the time with minimal false positives.)
 Here's a [link to my video result](./test_videos_output/project_video.mp4)
 
-
 #### 2. Describe how (and identify where in your code) you implemented some kind of filter for false positives and some method for combining overlapping bounding boxes.
 
 I recorded the positions of positive detections in each frame of the video.  From the positive detections I created a heatmap and then thresholded that map to identify vehicle positions.  I then used `scipy.ndimage.measurements.label()` to identify individual blobs in the heatmap.  I then assumed each blob corresponded to a vehicle.  I constructed bounding boxes to cover the area of each blob detected.  
 
 ### Here's an example:
+
 ![alt text][image4]
 
 ---
