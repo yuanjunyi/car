@@ -64,6 +64,9 @@ public:
    */
   void UpdateEKF(const Eigen::VectorXd &z);
 
+private:
+  Eigen::MatrixXd CalculateJacobian(const Eigen::VectorXd& x_state);
+
 };
 
 #endif /* KALMAN_FILTER_H_ */
