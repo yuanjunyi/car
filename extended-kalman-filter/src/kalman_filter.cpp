@@ -13,21 +13,23 @@ KalmanFilter::KalmanFilter() {}
 
 KalmanFilter::~KalmanFilter() {}
 
-void KalmanFilter::Init(VectorXd &x_in, MatrixXd &P_in, MatrixXd &F_in,
-                        MatrixXd &H_in, MatrixXd &R_in, MatrixXd &Q_in) {
+void KalmanFilter::Init(const VectorXd &x_in,
+                        const MatrixXd &P_in,
+                        const MatrixXd &F_in,
+                        const MatrixXd &H_in,
+                        const MatrixXd &R_laser_in,
+                        const MatrixXd &R_rader_in,
+                        const MatrixXd &Q_in) {
   x_ = x_in;
   P_ = P_in;
   F_ = F_in;
   H_ = H_in;
-  R_ = R_in;
+  R_laser_ = R_laser_in;
+  R_rader_ = R_rader_in;
   Q_ = Q_in;
 }
 
 void KalmanFilter::Predict() {
-  /**
-  TODO:
-    * predict the state
-  */
   x_ = F_ * x_;
   P_ = F_ * P_ * F_.transpose() + Q_;
 }
@@ -38,7 +40,7 @@ void KalmanFilter::Update(const VectorXd &z) {
     * update the state by using Kalman Filter equations
   */
   const VectorXd y = z - H_ * x_;
-  const MatrixXd S = H_ * P_ * H_.transpose() + R_;
+  const MatrixXd S = H_ * P_ * H_.transpose() + R_laser_;
   const MatrixXd K = P_ * H_.transpose() * S.inverse();
 
   x_ = x_ + K * y;
@@ -58,11 +60,18 @@ void KalmanFilter::UpdateEKF(const VectorXd &z) {
 
   VectorXd hx(3);
   const double d = sqrt(px * px + py * py);
-  hx << d, atan2(py, px), (px * vx + py * vy) / d;
+  
+  double bearing = atan2(py, px);
+  while (bearing < -M_PI)
+    bearing += 2.0 * M_PI;
+  while (bearing > M_PI)
+    bearing -= 2.0 * M_PI;
+
+  hx << d, bearing, (px * vx + py * vy) / d;
 
   const VectorXd y = z - hx;
   const MatrixXd Hj = CalculateJacobian(x_);
-  const MatrixXd S = Hj * P_ * Hj.transpose() + R_;
+  const MatrixXd S = Hj * P_ * Hj.transpose() + R_rader_;
   const MatrixXd K = P_ * Hj.transpose() * S.inverse();
 
   x_ = x_ + K * y;
@@ -78,15 +87,17 @@ MatrixXd KalmanFilter::CalculateJacobian(const VectorXd & x_state)
   const double vx = x_state(2);
   const double vy = x_state(3);
 
-  if (abs(px) < 0.001 && abs(py) < 0.001) {
+  const double c1 = px*px + py*py;
+  const double c2 = sqrt(c1);
+  const double c3 = c1 * c2;
+  if (c1 < 0.0001) {
     cout << "Error in KalmanFilter::CalculateJacobian(): px and py are both zero" << endl;
     return Hj;
   }
 
-  const double d = px * px + py * py;
-  Hj << px / sqrt(d), py / sqrt(d), 0, 0,
-        -py / d, px / d, 0, 0,
-        py * (vx * py - vy * px) / pow(d, 1.5), px * (vy * px - vx * py) / pow(d, 1.5), px / d, py / d;
+  Hj << px/c2, py/c2, 0, 0,
+        -py/c1, px/c1, 0, 0,
+        py*(vx*py - vy*px)/c3, px*(px*vy - py*vx)/c3, px/c2, py/c2;
 
   return Hj;
 }
