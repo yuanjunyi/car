@@ -87,8 +87,8 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
     }
 
     ekf_.x_ << px, py, 0, 0;
-    ekf_.P_ << 1000, 0, 0, 0,
-               0, 1000, 0, 0,
+    ekf_.P_ << 1, 0, 0, 0,
+               0, 1, 0, 0,
                0, 0, 1000, 0,
                0, 0, 0, 1000;
 
