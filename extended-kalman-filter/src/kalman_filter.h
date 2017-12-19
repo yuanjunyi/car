@@ -25,22 +25,13 @@ public:
   Eigen::MatrixXd R_rader_;
 
   /**
-   * Constructor
-   */
-  KalmanFilter();
-
-  /**
-   * Destructor
-   */
-  virtual ~KalmanFilter();
-
-  /**
    * Init Initializes Kalman filter
    * @param x_in Initial state
    * @param P_in Initial state covariance
    * @param F_in Transition matrix
    * @param H_in Measurement matrix
-   * @param R_in Measurement covariance matrix
+   * @param R_laser_in Measurement covariance matrix
+   * @param R_rader_in Measurement covariance matrix
    * @param Q_in Process covariance matrix
    */
   void Init(const Eigen::VectorXd &x_in,
@@ -54,7 +45,6 @@ public:
   /**
    * Prediction Predicts the state and the state covariance
    * using the process model
-   * @param delta_T Time between k and k+1 in s
    */
   void Predict();
 
@@ -71,6 +61,7 @@ public:
   void UpdateEKF(const Eigen::VectorXd &z);
 
 private:
+  double LimitToPi(double bearing);
   Eigen::MatrixXd CalculateJacobian(const Eigen::VectorXd& x_state);
 
 };

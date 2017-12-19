@@ -6,13 +6,6 @@ using Eigen::MatrixXd;
 using Eigen::VectorXd;
 using namespace std;
 
-// Please note that the Eigen library does not initialize 
-// VectorXd or MatrixXd objects with zeros upon creation.
-
-KalmanFilter::KalmanFilter() {}
-
-KalmanFilter::~KalmanFilter() {}
-
 void KalmanFilter::Init(const VectorXd &x_in,
                         const MatrixXd &P_in,
                         const MatrixXd &F_in,
@@ -35,10 +28,6 @@ void KalmanFilter::Predict() {
 }
 
 void KalmanFilter::Update(const VectorXd &z) {
-  /**
-  TODO:
-    * update the state by using Kalman Filter equations
-  */
   const VectorXd y = z - H_ * x_;
   const MatrixXd S = H_ * P_ * H_.transpose() + R_laser_;
   const MatrixXd K = P_ * H_.transpose() * S.inverse();
@@ -49,26 +38,18 @@ void KalmanFilter::Update(const VectorXd &z) {
 }
 
 void KalmanFilter::UpdateEKF(const VectorXd &z) {
-  /**
-  TODO:
-    * update the state by using Extended Kalman Filter equations
-  */
   const double px = x_(0);
   const double py = x_(1);
   const double vx = x_(2);
   const double vy = x_(3);
 
-  VectorXd hx(3);
   const double d = sqrt(px*px + py*py);
+  VectorXd hx(3);
   hx << d, atan2(py, px), (px*vx + py*vy) / d;
   
   VectorXd y = z - hx;
   double bearing = y(1);
-  while (bearing < -M_PI)
-    bearing += 2*M_PI;
-  while (bearing > M_PI)
-    bearing -= 2*M_PI;
-  y(1) = bearing;
+  y(1) = LimitToPi(bearing);
 
   const MatrixXd Hj = CalculateJacobian(x_);
   const MatrixXd S = Hj * P_ * Hj.transpose() + R_rader_;
@@ -77,6 +58,15 @@ void KalmanFilter::UpdateEKF(const VectorXd &z) {
   x_ = x_ + K * y;
   const MatrixXd I = MatrixXd::Identity(x_.size(), x_.size());
   P_ = (I - K * Hj) * P_;
+}
+
+double KalmanFilter::LimitToPi(double bearing)
+{
+  while (bearing < -M_PI)
+    bearing += 2*M_PI;
+  while (bearing > M_PI)
+    bearing -= 2*M_PI;
+  return bearing;
 }
 
 MatrixXd KalmanFilter::CalculateJacobian(const VectorXd & x_state)
