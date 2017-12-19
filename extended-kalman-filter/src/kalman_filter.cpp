@@ -59,17 +59,17 @@ void KalmanFilter::UpdateEKF(const VectorXd &z) {
   const double vy = x_(3);
 
   VectorXd hx(3);
-  const double d = sqrt(px * px + py * py);
+  const double d = sqrt(px*px + py*py);
+  hx << d, atan2(py, px), (px*vx + py*vy) / d;
   
-  double bearing = atan2(py, px);
+  VectorXd y = z - hx;
+  double bearing = y(1);
   while (bearing < -M_PI)
-    bearing += 2.0 * M_PI;
+    bearing += 2*M_PI;
   while (bearing > M_PI)
-    bearing -= 2.0 * M_PI;
+    bearing -= 2*M_PI;
+  y(1) = bearing;
 
-  hx << d, bearing, (px * vx + py * vy) / d;
-
-  const VectorXd y = z - hx;
   const MatrixXd Hj = CalculateJacobian(x_);
   const MatrixXd S = Hj * P_ * Hj.transpose() + R_rader_;
   const MatrixXd K = P_ * Hj.transpose() * S.inverse();
