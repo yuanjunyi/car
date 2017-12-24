@@ -61,7 +61,7 @@ UKF::UKF() {
 
   weights_ = VectorXd(2 * n_aug_ + 1);
   weights_.fill(0.5 / (lambda_ + n_aug_));
-  weights_(0) = lambda_ /(lambda_ + n_aug_);
+  weights_(0) = lambda_ / (lambda_ + n_aug_);
 }
 
 /**
@@ -96,7 +96,14 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     is_initialized_ = true;
     time_us_ = meas_package.timestamp_;
   } else {
-
+    const double delta_t = (meas_package.timestamp_ - time_us_) / 1000000.0;
+    time_us_ = meas_package.timestamp_;
+    Prediction(delta_t);
+    if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
+      UpdateLidar(meas_package);
+    } else {
+      UpdateRadar(meas_package);
+    }
   }
 }
 
@@ -127,7 +134,7 @@ void UKF::Prediction(double delta_t) {
   MatrixXd P_aug_sqrt = P_aug.llt().matrixL();
   Xsig_aug.col(0) = x_aug;
   for (int i = 0; i < n_aug_; ++i) {
-      Xsig_aug.col(i+1)       = x_aug + std::sqrt(lambda_ + n_aug_) * P_aug_sqrt.col(i);
+      Xsig_aug.col(i+1)        = x_aug + std::sqrt(lambda_ + n_aug_) * P_aug_sqrt.col(i);
       Xsig_aug.col(i+1+n_aug_) = x_aug - std::sqrt(lambda_ + n_aug_) * P_aug_sqrt.col(i);
   }
 
@@ -218,6 +225,7 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   Tc.fill(0);
   for (int i = 0; i < 2 * n_aug_ + 1; ++i) {
     VectorXd x_diff = Xsig_pred_.col(i) - x_;
+    x_diff(3) = NormalizeAngleToPi(x_diff(3));
     VectorXd z_diff = Zsig.col(i) - z_pred;
     Tc = Tc + weights_(i) * x_diff * z_diff.transpose();
   }
