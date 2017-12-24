@@ -32,6 +32,7 @@ FusionEKF::FusionEKF() : is_initialized_(false), previous_timestamp_(0) {
 void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
   if (!is_initialized_) {
     InitializeWithFirstMeasurement(measurement_pack);
+    return;
   }
 
   /*****************************************************************************
