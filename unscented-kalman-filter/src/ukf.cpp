@@ -15,7 +15,7 @@ UKF::UKF() {
   use_laser_ = true;
 
   // if this is false, radar measurements will be ignored (except during init)
-  use_radar_ = true;
+  use_radar_ = false;
 
   // initial state vector
   x_ = VectorXd(5);
@@ -99,9 +99,10 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     const double delta_t = (meas_package.timestamp_ - time_us_) / 1000000.0;
     time_us_ = meas_package.timestamp_;
     Prediction(delta_t);
-    if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
+    if (meas_package.sensor_type_ == MeasurementPackage::LASER && use_laser_) {
       UpdateLidar(meas_package);
-    } else {
+    }
+    else if (meas_package.sensor_type_ == MeasurementPackage::RADAR && use_radar_) {
       UpdateRadar(meas_package);
     }
   }
@@ -234,6 +235,9 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   VectorXd z_diff = meas_package.raw_measurements_ - z_pred;
   x_ = x_ + K * z_diff;
   P_ = P_ - K * S * K.transpose();
+
+  const double NIS = z_diff.transpose() * S.inverse() * z_diff;
+  cout << NIS << endl;
 }
 
 /**
@@ -301,6 +305,9 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   z_diff(1) = NormalizeAngleToPi(z_diff(1));
   x_ = x_ + K * z_diff;
   P_ = P_ - K * S * K.transpose();
+
+  const double NIS = z_diff.transpose() * S.inverse() * z_diff;
+  cout << NIS << endl;
 }
 
 double UKF::NormalizeAngleToPi(double angle) {
