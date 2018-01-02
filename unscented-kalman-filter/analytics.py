@@ -17,7 +17,7 @@ if __name__ == '__main__':
 		acceleration_yaw = [(j[2]-i[2]) / 0.05 for i, j in zip(measurements[:-1], measurements[1:])]
 		acceleration_yawrate = [(j[3]-i[3]) / 0.05 for i, j in zip(measurements[:-1], measurements[1:])]
 		
-		print(np.std(acceleration_vx), np.max(acceleration_vx))
-		print(np.std(acceleration_vy), np.max(acceleration_vy))
-		print(np.std(acceleration_yaw), np.max(acceleration_yaw))
-		print(np.std(acceleration_yawrate), np.max(acceleration_yawrate))
+		print(np.std(acceleration_vx), np.max(acceleration_vx), np.mean(acceleration_vx))
+		print(np.std(acceleration_vy), np.max(acceleration_vy), np.mean(acceleration_vy))
+		print(np.std(acceleration_yaw), np.max(acceleration_yaw), np.mean(acceleration_yaw))
+		print(np.std(acceleration_yawrate), np.max(acceleration_yawrate), np.mean(acceleration_yawrate))
