@@ -15,7 +15,10 @@ UKF::UKF() {
   use_laser_ = true;
 
   // if this is false, radar measurements will be ignored (except during init)
-  use_radar_ = false;
+  use_radar_ = true;
+
+  // if this is true, NIS will be computed and displayed to stdout
+  compute_nis_ = false;
 
   // initial state vector
   x_ = VectorXd(5);
@@ -24,10 +27,10 @@ UKF::UKF() {
   P_ = MatrixXd(5, 5);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 30;
+  std_a_ = 1.35;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 30;
+  std_yawdd_ = 0.39;
   
   //DO NOT MODIFY measurement noise values below these are provided by the sensor manufacturer.
   // Laser measurement noise standard deviation position1 in m
@@ -236,8 +239,11 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   x_ = x_ + K * z_diff;
   P_ = P_ - K * S * K.transpose();
 
-  const double NIS = z_diff.transpose() * S.inverse() * z_diff;
-  cout << NIS << endl;
+  if (compute_nis_)
+  {
+    const double NIS = z_diff.transpose() * S.inverse() * z_diff;
+    cout << NIS << endl;
+  }
 }
 
 /**
@@ -306,8 +312,11 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   x_ = x_ + K * z_diff;
   P_ = P_ - K * S * K.transpose();
 
-  const double NIS = z_diff.transpose() * S.inverse() * z_diff;
-  cout << NIS << endl;
+  if (compute_nis_)
+  {
+    const double NIS = z_diff.transpose() * S.inverse() * z_diff;
+    cout << NIS << endl;
+  }
 }
 
 double UKF::NormalizeAngleToPi(double angle) {
