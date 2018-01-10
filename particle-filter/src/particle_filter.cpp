@@ -98,7 +98,7 @@ void ParticleFilter::updateWeights(double sensor_range,
         {
             if (dist(particle.x, particle.y, landmark.x_f, landmark.y_f) < sensor_range) {
                 LandmarkObs obs;
-                obs.id = landmark.id;
+                obs.id = landmark.id_i;
                 obs.x = landmark.x_f;
                 obs.y = landmark.y_f;
                 predicted.push_back(obs);
@@ -146,15 +146,15 @@ double ParticleFilter::ComputeMultivariateGaussianProbability(double x,
 
 LandmarkObs ParticleFilter::ToLandmarkObs(const Map::single_landmark_s& maplandmark) {
     LandmarkObs obs;
-    obs.id = maplandmark.id;
+    obs.id = maplandmark.id_i;
     obs.x = maplandmark.x_f;
     obs.y = maplandmark.y_f;
-    retuen obs;
+    return obs;
 }
 
 LandmarkObs ParticleFilter::SearchLandmark(const Map& map, int id) {
-    for (auto maplandmark : map.map_landmarks) {
-        if (maplandmark.id == id) {
+    for (auto maplandmark : map.landmark_list) {
+        if (maplandmark.id_i == id) {
             return ToLandmarkObs(maplandmark);
         }
     }
