@@ -47,11 +47,19 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
     normal_distribution<double> dist_theta(0, std_pos[2]);
 
     for (int i = 0; i < num_particles; ++i) {
-        const double theta = particles[i].theta;
-        const double new_theta = theta + yaw_rate * delta_t;
-        particles[i].x = particles[i].x / yaw_rate * (sin(new_theta) - sin(theta)) + dist_x(generator);
-        particles[i].y = particles[i].y / yaw_rate * (cos(theta) - cos(new_theta)) + dist_y(generator);
-        particles[i].theta = new_theta + dist_theta(generator);
+        if (abs(yaw_rate) < 1e-5) {
+            particles[i].x += velocity * delta_t * cos(particles[i].theta);
+            particles[i].y += velocity * delta_t * sin(particles[i].theta);
+        } else {
+            const double theta = particles[i].theta;
+            const double new_theta = theta + yaw_rate * delta_t;
+            particles[i].x += velocity / yaw_rate * (sin(new_theta) - sin(theta));
+            particles[i].y += velocity / yaw_rate * (cos(theta) - cos(new_theta));
+            particles[i].theta = new_theta;
+        }
+        particles[i].x += dist_x(generator);
+        particles[i].y += dist_y(generator);
+        particles[i].theta += dist_theta(generator);
     }
 }
 
@@ -64,16 +72,16 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
     for (int i = 0; i < observations.size(); ++i)
     {
         double min_distance = dist(observations[i].x, observations[i].y, predicted[0].x, predicted[0].y);
-        int min_distance_id = predicted[0].id;
+        int min_distance_pos = 0;
         for (int j = 1; j < predicted.size(); ++j)
         {
             double distance = dist(observations[i].x, observations[i].y, predicted[j].x, predicted[j].y);
             if (distance < min_distance) {
                 min_distance = distance;
-                min_distance_id = predicted[j].id;
+                min_distance_pos = j;
             }
         }
-        observations[i].id = min_distance_id;
+        observations[i].id = min_distance_pos;
     }
 }
 
@@ -119,8 +127,8 @@ void ParticleFilter::updateWeights(double sensor_range,
         double weight = 1;
         for (auto obs_map : observations_map)
         {
-            int nearest_landmark_id = obs_map.id;
-            LandmarkObs nearest = SearchLandmark(map_landmarks, nearest_landmark_id);
+            int nearest_landmark_pos = obs_map.id;
+            LandmarkObs nearest = predicted[nearest_landmark_pos];
 
             weight *= ComputeMultivariateGaussianProbability(obs_map.x,
                                                              obs_map.y,
@@ -142,23 +150,6 @@ double ParticleFilter::ComputeMultivariateGaussianProbability(double x,
     double gauss_norm = 1 / (2 * M_PI * sigmax * sigmay);
     double exponent = (x-mux)*(x-mux)/(2*sigmax*sigmax) + (y-muy)*(y-muy)/(2*sigmay*sigmay);
     return gauss_norm * exp(-exponent);
-}
-
-LandmarkObs ParticleFilter::ToLandmarkObs(const Map::single_landmark_s& maplandmark) {
-    LandmarkObs obs;
-    obs.id = maplandmark.id_i;
-    obs.x = maplandmark.x_f;
-    obs.y = maplandmark.y_f;
-    return obs;
-}
-
-LandmarkObs ParticleFilter::SearchLandmark(const Map& map, int id) {
-    for (auto maplandmark : map.landmark_list) {
-        if (maplandmark.id_i == id) {
-            return ToLandmarkObs(maplandmark);
-        }
-    }
-    return LandmarkObs();
 }
 
 void ParticleFilter::resample() {

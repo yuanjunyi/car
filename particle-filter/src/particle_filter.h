@@ -108,10 +108,6 @@ private:
                                                   double muy,
                                                   double sigmax,
                                                   double sigmay);
-
-    LandmarkObs SearchLandmark(const Map& map, int id);
-
-    LandmarkObs ToLandmarkObs(const Map::single_landmark_s& maplandmark);
 };
 
 #endif /* PARTICLE_FILTER_H_ */
