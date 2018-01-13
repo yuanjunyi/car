@@ -18,16 +18,6 @@ public:
   double Kd;
 
   /*
-  * Constructor
-  */
-  PID();
-
-  /*
-  * Destructor.
-  */
-  virtual ~PID();
-
-  /*
   * Initialize PID.
   */
   void Init(double Kp, double Ki, double Kd);
