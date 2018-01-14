@@ -18,6 +18,11 @@ public:
   double Kd;
 
   /*
+  * Constructor
+  */
+  PID();
+
+  /*
   * Initialize PID.
   */
   void Init(double Kp, double Ki, double Kd);

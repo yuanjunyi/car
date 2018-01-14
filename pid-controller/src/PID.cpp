@@ -1,5 +1,6 @@
 #include "PID.h"
-using namespace std;
+
+PID::PID() : p_error(0), i_error(0), d_error(0) {}
 
 void PID::Init(double Kp, double Ki, double Kd) {
   this->Kp = Kp;
