@@ -38,14 +38,14 @@ class FG_eval {
   FG_eval(Eigen::VectorXd coeffs) { this->coeffs = coeffs; }
 
   // Derivative of coeffs[0] + coeffs[1]*x + coeffs[2]*x*x + coeffs[3]*x*x*x
-  double derivative(Eigen::VectorXd coeffs, double x) {
+  AD<double> derivative(Eigen::VectorXd coeffs, AD<double> x) {
     return coeffs[1] + 2*coeffs[2]*x + 3*coeffs[3]*x*x;
   }
 
-  double polyeval(Eigen::VectorXd coeffs, double x) {
-    double result = 0.0;
+  AD<double> polyeval(Eigen::VectorXd coeffs, AD<double> x) {
+    AD<double> result = 0.0;
     for (int i = 0; i < coeffs.size(); i++) {
-      result += coeffs[i] * pow(x, i);
+      result += coeffs[i] * CppAD::pow(x, i);
     }
     return result;
   }
@@ -107,7 +107,7 @@ class FG_eval {
       AD<double> a0 = vars[a_start + t - 1];
 
       AD<double> f0 = polyeval(coeffs, x0);
-      AD<double> psides0 = CppAD::atan(derivative(x0));
+      AD<double> psides0 = CppAD::atan(derivative(coeffs, x0));
 
       fg[1 + x_start + t] = x1 - (x0 + v0 * CppAD::cos(psi0) * dt);
       fg[1 + y_start + t] = y1 - (y0 + v0 * CppAD::sin(psi0) * dt);
@@ -135,12 +135,12 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
 
   // Initial value of the independent variables.
   // SHOULD BE 0 besides initial state.
-  const double x = x0[0];
-  const double y = x0[1];
-  const double psi = x0[2];
-  const double v = x0[3];
-  const double cte = x0[4];
-  const double epsi = x0[5];
+  const double x = state[0];
+  const double y = state[1];
+  const double psi = state[2];
+  const double v = state[3];
+  const double cte = state[4];
+  const double epsi = state[5];
 
   Dvector vars(n_vars);
   for (int i = 0; i < n_vars; i++) {
