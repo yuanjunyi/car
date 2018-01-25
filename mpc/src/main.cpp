@@ -12,6 +12,8 @@
 // for convenience
 using json = nlohmann::json;
 
+using namespace Eigen;
+
 // For converting back and forth between radians and degrees.
 constexpr double pi() { return M_PI; }
 double deg2rad(double x) { return x * pi() / 180; }
@@ -39,6 +41,11 @@ double polyeval(Eigen::VectorXd coeffs, double x) {
     result += coeffs[i] * pow(x, i);
   }
   return result;
+}
+
+// Derivative of coeffs[0] + coeffs[1]*x + coeffs[2]*x*x + coeffs[3]*x*x*x
+double derivative(Eigen::VectorXd coeffs, double x) {
+  return coeffs[1] + 2*coeffs[2]*x + 3*coeffs[3]*x*x;
 }
 
 // Fit a polynomial.
@@ -98,8 +105,19 @@ int main() {
           * Both are in between [-1, 1].
           *
           */
-          double steer_value;
-          double throttle_value;
+          Map<VectorXd> ptsx_eigen(ptsx.data(), ptsx.size());
+          Map<VectorXd> ptsy_eigen(ptsy.data(), ptsy.size());
+          VectorXd coeffs = polyfit(ptsx_eigen, ptsy_eigen, 3);
+
+          double cte = polyeval(coeffs, px) - py;
+          double epsi = psi - atan(derivative(coeffs, x));
+
+          VectorXd state(6);
+          state << px, py, psi, v, cte, epsi;
+          auto solution = mpc.Solve(state, coeffs);
+
+          double steer_value = -solution[2] / 0.436332;
+          double throttle_value = solution[3];
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
@@ -113,6 +131,8 @@ int main() {
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
+          mpc_x_vals.push_back(solution[0]);
+          mpc_y_vals.push_back(solution[1])
 
           msgJson["mpc_x"] = mpc_x_vals;
           msgJson["mpc_y"] = mpc_y_vals;
@@ -123,6 +143,8 @@ int main() {
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
+          next_x_vals.push_back(px);
+          next_y_vals.push_back(py);
 
           msgJson["next_x"] = next_x_vals;
           msgJson["next_y"] = next_y_vals;
