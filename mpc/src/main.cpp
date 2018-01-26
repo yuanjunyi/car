@@ -142,6 +142,9 @@ int main() {
           msgJson["steering_angle"] = steer_value;
           msgJson["throttle"] = throttle_value;
 
+          cout << "steering_angle = " << steer_value
+               << " throttle = " << throttle << endl;
+
           vector<double> mpc_x_vals(solution.begin(), solution.begin() + solution.size() / 2);
           vector<double> mpc_y_vals(solution.begin() + solution.size() / 2, solution.end());
 
@@ -153,7 +156,6 @@ int main() {
 
 
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-          std::cout << msg << std::endl;
           // Latency
           // The purpose is to mimic real driving conditions where
           // the car does actuate the commands instantly.
