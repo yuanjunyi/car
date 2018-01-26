@@ -134,7 +134,7 @@ int main() {
           double throttle_value = solution.back();
           solution.pop_back();
 
-          double steer_value = -solution.back() / 0.436332;
+          double steer_value = -solution.back();
           solution.pop_back();
 
           json msgJson;

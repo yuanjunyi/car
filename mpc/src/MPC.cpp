@@ -5,8 +5,8 @@
 
 using CppAD::AD;
 
-const int N = 20;
-const double dt = 0.05;
+const int N = 8;
+const double dt = 0.3;
 
 // This value assumes the model presented in the classroom is used.
 //
