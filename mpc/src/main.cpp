@@ -143,7 +143,7 @@ int main() {
           msgJson["throttle"] = throttle_value;
 
           cout << "steering_angle = " << steer_value
-               << " throttle = " << throttle << endl;
+               << " throttle = " << throttle_value << endl;
 
           vector<double> mpc_x_vals(solution.begin(), solution.begin() + solution.size() / 2);
           vector<double> mpc_y_vals(solution.begin() + solution.size() / 2, solution.end());
