@@ -102,7 +102,8 @@ int main() {
           double px = j[1]["x"];
           double py = j[1]["y"];
           double psi = j[1]["psi"];
-          double v = j[1]["speed"] * 0.44704; // Convert from mph to m/s
+          double v = j[1]["speed"];
+          v *= 0.44704; // Convert from mph to m/s
 
           // Transform waypoints from map coordinate to car coordinate.
           vector<double> waypointx;
