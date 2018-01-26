@@ -82,8 +82,6 @@ void transform(double x0, double y0, double psi, double& x, double& y) {
 
 int main() {
   uWS::Hub h;
-
-  // MPC is initialized here!
   MPC mpc;
 
   h.onMessage([&mpc](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
@@ -92,7 +90,6 @@ int main() {
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
     string sdata = string(data).substr(0, length);
-    cout << sdata << endl;
     if (sdata.size() > 2 && sdata[0] == '4' && sdata[1] == '2') {
       string s = hasData(sdata);
       if (s != "") {
@@ -105,18 +102,12 @@ int main() {
           double px = j[1]["x"];
           double py = j[1]["y"];
           double psi = j[1]["psi"];
-          double v = j[1]["speed"];
+          double v = j[1]["speed"] * 0.44704; // Convert from mph to m/s
 
-          /*
-          * TODO: Calculate steering angle and throttle using MPC.
-          *
-          * Both are in between [-1, 1].
-          *
-          */
-
+          // Transform waypoints from map coordinate to car coordinate.
           vector<double> waypointx;
           vector<double> waypointy;
-          for (int i = 0; i < ptsx.size(); ++i)
+          for (size_t i = 0; i < ptsx.size(); ++i)
           {
             double x = ptsx[i];
             double y = ptsy[i];
@@ -124,15 +115,16 @@ int main() {
             waypointx.push_back(x);
             waypointy.push_back(y);
           }
+          px = 0;
+          py = 0;
+          psi = 0;
 
           Map<VectorXd> ptsx_eigen(waypointx.data(), waypointx.size());
           Map<VectorXd> ptsy_eigen(waypointy.data(), waypointy.size());
           VectorXd coeffs = polyfit(ptsx_eigen, ptsy_eigen, 3);
 
-          px = 0;
-          py = 0;
-          double cte = polyeval(coeffs, px) - py;
-          double epsi = psi - atan(derivative(coeffs, px));
+          const double cte = polyeval(coeffs, px) - py;
+          const double epsi = psi - atan(derivative(coeffs, px));
 
           VectorXd state(6);
           state << px, py, psi, v, cte, epsi;
