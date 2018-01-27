@@ -19,7 +19,7 @@ const double dt = 0.3;
 //
 // This is the length from front to CoG that has a similar radius.
 const double Lf = 2.67;
-const double ref_v = 20;
+const double ref_v = 20;  // m/s
 
 const int x_start = 0;
 const int y_start = x_start + N;
@@ -127,9 +127,10 @@ MPC::~MPC() {}
 vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   typedef CPPAD_TESTVECTOR(double) Dvector;
 
-  // TODO: Set the number of model variables (includes both states and inputs).
+  // Set the number of model variables (includes both states and inputs)
   const int n_vars = N * 6 + (N - 1) * 2;
-  // TODO: Set the number of constraints
+
+  // Set the number of constraints
   const int n_constraints = N * 6;
 
   // Initial value of the independent variables.
@@ -156,20 +157,20 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   Dvector vars_lowerbound(n_vars);
   Dvector vars_upperbound(n_vars);
   
-  // TODO: Set lower and upper limits for variables.
+  // Set lower and upper limits for variables.
   for (int i = 0; i < delta_start; i++) {
     vars_lowerbound[i] = -1.0e19;
     vars_upperbound[i] = 1.0e19;
   }
 
-  for (int i = 0; i < N - 1; i++) {
-    vars_lowerbound[delta_start + i] = -0.436332;
-    vars_upperbound[delta_start + i] = 0.436332;
+  for (int t = 0; t < N - 1; t++) {
+    vars_lowerbound[delta_start + t] = -0.436332;  // 25 degree
+    vars_upperbound[delta_start + t] = 0.436332;
   }
 
-  for (int i = 0; i < N - 1; i++) {
-    vars_lowerbound[a_start + i] = -1;
-    vars_upperbound[a_start + i] = 1;
+  for (int t = 0; t < N - 1; t++) {
+    vars_lowerbound[a_start + t] = -1;  // 1 m/s^2
+    vars_upperbound[a_start + t] = 1;
   }
 
   // Lower and upper limits for the constraints
@@ -229,14 +230,14 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
 
   // Cost
   auto cost = solution.obj_value;
-  std::cout << "Cost " << cost << std::endl;
+  std::cout << "cost: " << cost;
 
   vector<double> results;
-  for (int i = 0; i < N; ++i) {
-    results.push_back(solution.x[x_start + i]);
+  for (int t = 0; t < N; ++t) {
+    results.push_back(solution.x[x_start + t]);
   }
-  for (int i = 0; i < N; ++i) {
-    results.push_back(solution.x[y_start + i]);
+  for (int t = 0; t < N; ++t) {
+    results.push_back(solution.x[y_start + t]);
   }
   results.push_back(solution.x[delta_start]);
   results.push_back(solution.x[a_start]);

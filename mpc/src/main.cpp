@@ -4,6 +4,7 @@
 #include <iostream>
 #include <thread>
 #include <vector>
+#include <limits>
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
 #include "MPC.h"
@@ -48,6 +49,10 @@ double derivative(Eigen::VectorXd coeffs, double x) {
   return coeffs[1] + 2*coeffs[2]*x + 3*coeffs[3]*x*x;
 }
 
+double distance(double x1, double y1, double x2, double y2) {
+  return sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2));
+}
+
 // Fit a polynomial.
 // Adapted from
 // https://github.com/JuliaMath/Polynomials.jl/blob/master/src/Polynomials.jl#L676-L716
@@ -75,9 +80,9 @@ Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals,
 void transform(double x0, double y0, double psi, double& x, double& y) {
   const double alpha = atan2(y - y0, x - x0);
   const double beta = psi - alpha;
-  const double distance = sqrt((x - x0) * (x - x0) + (y - y0) * (y - y0));
-  x = distance * cos(beta);
-  y = -distance * sin(beta);
+  const double d = distance(x0, y0, x, y);
+  x = d * cos(beta);
+  y = -d * sin(beta);
 }
 
 int main() {
@@ -105,7 +110,29 @@ int main() {
           double v = j[1]["speed"];
           v *= 0.44704; // Convert from mph to m/s
 
-          // Transform waypoints from map coordinate to car coordinate.
+          // Compute the vehicle position after 100ms latency
+          const double dt = 0.1;  // 100ms = 0.1s
+          px = px + v * cos(psi) * dt;
+          py = py + v * sin(psi) * dt;
+
+          // Find the nearest waypoint
+          double minDistance = numeric_limits<double>::max();
+          size_t nearest = 0;
+          for (size_t i = 0; i < ptsx.size(); ++i) {
+            double d = distance(px, py, ptsx[i], ptsy[i]);
+            if (d < minDistance) {
+              minDistance = d;
+              nearest = i;
+            }
+          }
+
+          // Discard the waypoints that are behind the vehicle
+          if (nearest != 0) {
+            ptsx.erase(ptsx.cbegin(), ptsx.cbegin() + nearest);
+            ptsy.erase(ptsy.cbegin(), ptsy.cbegin() + nearest);
+          }
+
+          // Transform waypoints from map coordinate to car coordinate
           vector<double> waypointx;
           vector<double> waypointy;
           for (size_t i = 0; i < ptsx.size(); ++i)
@@ -116,24 +143,29 @@ int main() {
             waypointx.push_back(x);
             waypointy.push_back(y);
           }
+
+          // Transfrom car postion and orientation to car coordinate
           px = 0;
           py = 0;
           psi = 0;
 
+          // Fit 3rd order polynomial and pass to MPC
           Map<VectorXd> ptsx_eigen(waypointx.data(), waypointx.size());
           Map<VectorXd> ptsy_eigen(waypointy.data(), waypointy.size());
           VectorXd coeffs = polyfit(ptsx_eigen, ptsy_eigen, 3);
-
           const double cte = polyeval(coeffs, px) - py;
           const double epsi = psi - atan(derivative(coeffs, px));
-
           VectorXd state(6);
           state << px, py, psi, v, cte, epsi;
           auto solution = mpc.Solve(state, coeffs);
 
+          // Acceleration from MPC is in m/s^2.
+          // Throttle in simulator is unknown but seems quite close to m/s^2.
           double throttle_value = solution.back();
           solution.pop_back();
 
+          // Delta from MPC is in radian.
+          // Steering angle in simulator is also in radian.
           double steer_value = -solution.back();
           solution.pop_back();
 
@@ -142,8 +174,8 @@ int main() {
           msgJson["steering_angle"] = steer_value;
           msgJson["throttle"] = throttle_value;
 
-          cout << "steering_angle = " << steer_value
-               << " throttle = " << throttle_value << endl;
+          cout << " steer: " << steer_value
+               << " throttle: " << throttle_value << endl;
 
           vector<double> mpc_x_vals(solution.begin(), solution.begin() + solution.size() / 2);
           vector<double> mpc_y_vals(solution.begin() + solution.size() / 2, solution.end());
