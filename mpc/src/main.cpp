@@ -144,7 +144,7 @@ int main() {
             waypointy.push_back(y);
           }
 
-          // Transfrom car postion and orientation to car coordinate
+          // Transfrom car position and orientation to car coordinate
           px = 0;
           py = 0;
           psi = 0;
