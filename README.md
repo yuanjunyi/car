@@ -8,5 +8,5 @@ This repository contains my projects in Udacity's Self-Driving Car Nanodegree.
 - [Extended kalman filter](https://github.com/yuanjunyi/car/tree/master/extended-kalman-filter)
 - [Unscented kalman filter](https://github.com/yuanjunyi/car/tree/master/unscented-kalman-filter)
 - [Partical filter](https://github.com/yuanjunyi/car/tree/master/particle-filter)
-- [Pid controller](https://github.com/yuanjunyi/car/tree/master/pid-controller)
-- [Model predictive control (MPC)](https://github.com/yuanjunyi/car/tree/master/model-predictive-control)
+- [PID controller](https://github.com/yuanjunyi/car/tree/master/pid-controller)
+- [Model Predictive Control (MPC)](https://github.com/yuanjunyi/car/tree/master/model-predictive-control)

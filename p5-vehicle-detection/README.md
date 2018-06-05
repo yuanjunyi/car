@@ -4,4 +4,4 @@ Created a vehicle detection and tracking pipeline with OpenCV, histogram of orie
 
 Detailed project description and starter code can be found [here](https://github.com/udacity/CarND-Vehicle-Detection).
 
-`Computer Vision` `OpenCV` `Machine Learning` `Support Vector Machines` `Python`
+`Computer Vision` `OpenCV` `Machine Learning` `Support Vector Machine` `Python`
