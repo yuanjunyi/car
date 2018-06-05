@@ -1,4 +1,4 @@
-####Model Predictive Control (MPC)####
+#### Model Predictive Control (MPC) ####
 
 Implemented Model Predictive Control to drive a vehicle around a track even with additional latency between commands.
 
